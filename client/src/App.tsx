@@ -33,10 +33,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }, [location, setLocation]);
 
   if (loading) {
-    return null;
+    return <div>Đang tải...</div>;
   }
 
-  return (
+  return auth.currentUser ? (
     <div className="flex h-screen">
       <Sidebar />
       <div className="flex-1 flex flex-col">
@@ -46,13 +46,18 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
-  );
+  ) : null;
 }
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/">
+        <PrivateRoute>
+          <Dashboard />
+        </PrivateRoute>
+      </Route>
       <Route path="/dashboard">
         <PrivateRoute>
           <Dashboard />

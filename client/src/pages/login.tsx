@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { login } from "@/lib/firebase";
 import { useLocation } from "wouter";
+import { FirebaseError } from "firebase/app";
 
 const loginSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
@@ -31,9 +32,32 @@ export default function Login() {
       await login(values.email, values.password);
       setLocation("/dashboard");
     } catch (error) {
+      let message = "Email hoặc mật khẩu không đúng";
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case 'auth/invalid-email':
+            message = "Email không hợp lệ";
+            break;
+          case 'auth/user-disabled':
+            message = "Tài khoản đã bị vô hiệu hóa";
+            break;
+          case 'auth/user-not-found':
+            message = "Không tìm thấy tài khoản với email này";
+            break;
+          case 'auth/wrong-password':
+            message = "Mật khẩu không đúng";
+            break;
+          case 'auth/network-request-failed':
+            message = "Lỗi kết nối mạng";
+            break;
+          case 'auth/too-many-requests':
+            message = "Quá nhiều lần thử đăng nhập không thành công. Vui lòng thử lại sau";
+            break;
+        }
+      }
       toast({
-        title: "Lỗi",
-        description: "Email hoặc mật khẩu không đúng",
+        title: "Lỗi đăng nhập",
+        description: message,
         variant: "destructive",
       });
     }
