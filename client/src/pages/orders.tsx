@@ -65,6 +65,7 @@ interface ShopifyOrder {
   createdAt: string;
   deadline: string | null;
   total: number;
+  qrCode: string | null; // Added qrCode field
 }
 
 type OrderFormData = {
@@ -94,7 +95,8 @@ export default function Orders() {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
+        qrCode: null // Initialize qrCode to null
       })) as ShopifyOrder[];
     }
   });
@@ -133,7 +135,8 @@ export default function Orders() {
                   notes: row.Notes || '',
                   createdAt: new Date().toISOString(),
                   deadline: row['Paid at'] || null,
-                  total: parseFloat(row.Total) || 0
+                  total: parseFloat(row.Total) || 0,
+                  qrCode: null // Initialize qrCode to null
                 });
               }
               resolve(true);
@@ -170,11 +173,17 @@ export default function Orders() {
     }
   };
 
-  const handleOrderSelect = (order: ShopifyOrder) => {
+  const handleOrderSelect = async (order: ShopifyOrder) => {
     setSelectedOrder(order);
-    QRCode.toDataURL(`Order ID: ${order.orderNumber}, Customer: ${order.customer.name}`)
-      .then(url => setQrCode(url))
-      .catch(err => console.error(err));
+    if (!order.qrCode) {
+      try {
+        const qrCodeDataUrl = await QRCode.toDataURL(`Order ID: ${order.orderNumber}, Customer: ${order.customer.name}`);
+        const updatedOrder = {...order, qrCode: qrCodeDataUrl};
+        setSelectedOrder(updatedOrder);
+      } catch (err) {
+        console.error(err);
+      }
+    }
   };
 
   const handleCloseDialog = () => {
@@ -257,53 +266,73 @@ export default function Orders() {
                 <TableCell>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</TableCell>
                 <TableCell>{order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : 'Chưa xác định'}</TableCell>
                 <TableCell>
-                  <Button onClick={() => handleOrderSelect(order)} variant="ghost" asChild>
-                    <Eye className="h-4 w-4"/>
-                  </Button>
-                </TableCell>
-                <TableCell>
-                  <Button onClick={() => handleOrderSelect(order)} variant="ghost" asChild>
-                    <Download className="h-4 w-4"/>
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button onClick={(e) => {
+                      e.stopPropagation();
+                      handleOrderSelect(order);
+                    }} variant="ghost">
+                      <Eye className="h-4 w-4"/>
+                    </Button>
+                    {order.qrCode && (
+                      <Button onClick={(e) => {
+                        e.stopPropagation();
+                        const link = document.createElement('a');
+                        link.href = order.qrCode;
+                        link.download = `order-${order.orderNumber}-qr.png`;
+                        link.click();
+                      }} variant="ghost">
+                        <Download className="h-4 w-4"/>
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+
       <Dialog open={selectedOrder !== null} onOpenChange={handleCloseDialog}>
-        <DialogHeader>
-          <DialogTitle>Chi tiết đơn hàng #{selectedOrder?.orderNumber}</DialogTitle>
-        </DialogHeader>
-        <DialogContent>
-          {/* Display order details here */}
-          <div>
-            <h2>Khách hàng:</h2>
-            <p>Tên: {selectedOrder?.customer.name}</p>
-            <p>Email: {selectedOrder?.customer.email}</p>
-            <p>Điện thoại: {selectedOrder?.customer.phone}</p>
-            <p>Địa chỉ: {selectedOrder?.customer.address}</p>
-          </div>
-          <div>
-            <h2>Sản phẩm:</h2>
-            <ul>
-              {selectedOrder?.products.map((product) => (
-                <li key={product.name}>
-                  {product.name} x {product.quantity}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-              <h2>Tổng tiền:</h2>
-              <p>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedOrder?.total || 0)}</p>
-          </div>
-          {qrCode && (
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Chi tiết đơn hàng #{selectedOrder?.orderNumber}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <h2>Mã QR:</h2>
-              <img src={qrCode} alt="QR Code" />
+              <h3 className="font-semibold mb-2">Thông tin khách hàng</h3>
+              <div className="space-y-1">
+                <p>Tên: {selectedOrder?.customer?.name}</p>
+                <p>Email: {selectedOrder?.customer?.email}</p>
+                <p>SĐT: {selectedOrder?.customer?.phone}</p>
+                <p>Địa chỉ: {selectedOrder?.customer?.address}</p>
+              </div>
             </div>
-          )}
+
+            <div>
+              <h3 className="font-semibold mb-2">Mã QR</h3>
+              {selectedOrder?.qrCode && (
+                <img src={selectedOrder.qrCode} alt="QR Code" className="w-32 h-32" />
+              )}
+            </div>
+
+            <div className="col-span-2">
+              <h3 className="font-semibold mb-2">Sản phẩm</h3>
+              <div className="space-y-2">
+                {selectedOrder?.products?.map((product, index) => (
+                  <div key={index} className="flex justify-between border-b pb-2">
+                    <span>{product.name}</span>
+                    <span>x{product.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="col-span-2">
+              <h3 className="font-semibold mb-2">Ghi chú</h3>
+              <p>{selectedOrder?.notes || 'Không có ghi chú'}</p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
