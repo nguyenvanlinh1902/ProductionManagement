@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QRScanner } from "@/components/scanner/qr-scanner";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase";
 import {
   Select,
   SelectContent,
@@ -9,13 +13,67 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { TabsList, TabsTrigger, Tabs, TabsContent } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Button } from "@/components/ui/button";
+
+const STAGES = [
+  { id: 'cutting', name: 'Cắt' },
+  { id: 'sewing', name: 'May' },
+  { id: 'packaging', name: 'Đóng gói' }
+];
 
 export default function Production() {
   const [selectedStage, setSelectedStage] = useState("");
   const { toast } = useToast();
+  const [scannedOrder, setScannedOrder] = useState(null);
+
+  const handleScan = async (orderId: string) => {
+    try {
+      if (!selectedStage) {
+        toast({
+          title: "Lỗi",
+          description: "Vui lòng chọn công đoạn sản xuất",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const orderRef = doc(db, "shopify_orders", orderId);
+      const orderDoc = await getDoc(orderRef);
+
+      if (!orderDoc.exists()) {
+        toast({
+          title: "Lỗi", 
+          description: "Không tìm thấy đơn hàng",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const orderData = orderDoc.data();
+      setScannedOrder(orderData);
+
+      await updateDoc(orderRef, {
+        [`stages.${selectedStage}.completed`]: true,
+        [`stages.${selectedStage}.completedAt`]: new Date(),
+        [`stages.${selectedStage}.completedBy`]: auth.currentUser?.uid
+      });
+
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật trạng thái ${STAGES.find(s => s.id === selectedStage)?.name}`
+      });
+
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật trạng thái",
+        variant: "destructive"
+      });
+    }
+  };
 
   // Lấy danh sách công đoạn 
   const { data: stages } = useQuery({
@@ -45,39 +103,6 @@ export default function Production() {
     }
   });
 
-  const handleScan = async (decodedText: string) => {
-    try {
-      if (!selectedStage) {
-        toast({
-          title: "Lỗi",
-          description: "Vui lòng chọn công đoạn sản xuất",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const response = await fetch(`/api/orders/${decodedText}/stages/${selectedStage}/complete`, {
-        method: 'POST'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update production stage');
-      }
-
-      toast({
-        title: "Thành công",
-        description: "Đã cập nhật trạng thái sản xuất",
-      });
-
-    } catch (error) {
-      console.error('Error updating production stage:', error);
-      toast({
-        title: "Lỗi",
-        description: "Không thể cập nhật trạng thái sản xuất",
-        variant: "destructive"
-      });
-    }
-  };
 
   if (isLoading) {
     return <div>Đang tải...</div>;
@@ -104,7 +129,7 @@ export default function Production() {
                       <SelectValue placeholder="Chọn công đoạn" />
                     </SelectTrigger>
                     <SelectContent>
-                      {stages?.map((stage: any) => (
+                      {STAGES.map((stage) => (
                         <SelectItem key={stage.id} value={stage.id}>
                           {stage.name}
                         </SelectItem>
@@ -113,6 +138,23 @@ export default function Production() {
                   </Select>
 
                   <QRScanner onScan={handleScan} />
+
+                  {scannedOrder && (
+                    <div className="mt-4 p-4 border rounded">
+                      <h3 className="font-medium">Thông tin đơn hàng #{scannedOrder.orderNumber}</h3>
+                      <div className="mt-2 space-y-2 text-sm">
+                        <p>Khách hàng: {scannedOrder.customer?.name}</p>
+                        <div className="mt-2">
+                          <p className="font-medium">Sản phẩm:</p>
+                          {scannedOrder.products?.map((product: any, index: number) => (
+                            <div key={index} className="ml-2">
+                              - {product.name} (x{product.quantity})
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -134,7 +176,7 @@ export default function Production() {
                           {new Date(order.createdAt).toLocaleDateString('vi-VN')}
                         </div>
                       </div>
-                      
+
                       <div className="border-t pt-2">
                         <div className="font-medium mb-2">Chi tiết đơn hàng:</div>
                         {order.products?.map((product: any, index: number) => (
@@ -150,7 +192,7 @@ export default function Production() {
                           </div>
                         ))}
                       </div>
-                      
+
                       {order.notes && (
                         <div className="text-sm text-gray-600 border-t pt-2">
                           <span className="font-medium">Ghi chú:</span> {order.notes}

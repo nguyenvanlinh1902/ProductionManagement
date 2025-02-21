@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertOrderSchema, insertProductSchema } from "@shared/schema";
+import QRCode from "qrcode";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Orders API
@@ -16,8 +17,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: result.error });
       return;
     }
+    
     const order = await storage.createOrder(result.data);
-    res.json(order);
+    const qrCode = await QRCode.toDataURL(order.id);
+    
+    await storage.updateOrder(order.id, {
+      ...order,
+      qrCode,
+      stages: {
+        cutting: { completed: false },
+        sewing: { completed: false },
+        packaging: { completed: false }
+      }
+    });
+    
+    res.json({...order, qrCode});
   });
 
   // Products API
