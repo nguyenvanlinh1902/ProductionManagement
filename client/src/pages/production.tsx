@@ -124,11 +124,38 @@ export default function Production() {
               <CardContent>
                 <div className="space-y-2">
                   {orders?.map((order: any) => (
-                    <div key={order.id} className="flex justify-between items-center p-2 border rounded">
-                      <div>
-                        <div className="font-medium">#{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">{order.customer?.name}</div>
+                    <div key={order.id} className="p-4 border rounded space-y-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-medium">#{order.orderNumber}</div>
+                          <div className="text-sm text-gray-500">{order.customer?.name}</div>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                        </div>
                       </div>
+                      
+                      <div className="border-t pt-2">
+                        <div className="font-medium mb-2">Chi tiết đơn hàng:</div>
+                        {order.products?.map((product: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center py-1">
+                            <div>
+                              <div className="font-medium">{product.name}</div>
+                              <div className="text-sm text-gray-500">
+                                SKU: {product.sku}
+                                {product.specifications && ` | ${product.specifications}`}
+                              </div>
+                            </div>
+                            <div>SL: {product.quantity}</div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {order.notes && (
+                        <div className="text-sm text-gray-600 border-t pt-2">
+                          <span className="font-medium">Ghi chú:</span> {order.notes}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
