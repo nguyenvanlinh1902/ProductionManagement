@@ -1,13 +1,12 @@
 
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from 'wouter';
 
 export function useNavigation() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const [location, setLocation] = useLocation();
   
   return {
-    current: location.pathname,
-    navigate: navigate,
-    isActive: (path: string) => location.pathname === path
+    current: location,
+    navigate: setLocation,
+    isActive: (path: string) => location === path
   };
 }
