@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { auth, getUserRole, createAdminAccount } from "@/lib/firebase";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 
 // Pages
 import Login from "@/pages/login";
@@ -12,11 +12,19 @@ import Orders from "@/pages/orders";
 import Production from "@/pages/production";
 import Warehouse from "@/pages/warehouse";
 import NotFound from "@/pages/not-found";
-import Settings from "@/pages/settings"; // Import the Settings component
+import Settings from "@/pages/settings";
+import Users from "@/pages/users";
+import Scan from "@/pages/scan";
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+
+function LoadingSpinner() {
+  return <div className="flex items-center justify-center h-full">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>;
+}
 
 function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
   const [location, setLocation] = useLocation();
@@ -26,7 +34,6 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Tạo tài khoản admin nếu chưa có
         await createAdminAccount();
       } catch (error) {
         console.error("Error creating admin account:", error);
@@ -53,7 +60,7 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
   }, [location, setLocation, requiredRole]);
 
   if (loading) {
-    return <div>Đang tải...</div>;
+    return <LoadingSpinner />;
   }
 
   if (!auth.currentUser || (requiredRole && userRole !== requiredRole)) {
@@ -66,7 +73,9 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
       <div className="flex-1 flex flex-col">
         <Header />
         <main className="flex-1 p-6 overflow-auto">
-          {children}
+          <Suspense fallback={<LoadingSpinner />}>
+            {children}
+          </Suspense>
         </main>
       </div>
     </div>
@@ -97,16 +106,26 @@ function Router() {
           <Production />
         </PrivateRoute>
       </Route>
+      <Route path="/scan">
+        <PrivateRoute requiredRole="worker">
+          <Scan />
+        </PrivateRoute>
+      </Route>
       <Route path="/warehouse">
         <PrivateRoute requiredRole="admin">
           <Warehouse />
         </PrivateRoute>
       </Route>
-      <Route path="/settings"> {/* Added route for Settings */}
+      <Route path="/users">
+        <PrivateRoute requiredRole="admin">
+          <Users />
+        </PrivateRoute>
+      </Route>
+      <Route path="/settings">
         <PrivateRoute requiredRole="admin">
           <Settings />
         </PrivateRoute>
-      </Route> {/* Added route for Settings */}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

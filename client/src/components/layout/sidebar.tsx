@@ -6,6 +6,8 @@ import {
   Factory,
   Package,
   Settings,
+  Users,
+  QrCode,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,9 @@ const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Tổng quan", href: "/dashboard" },
   { icon: ClipboardList, label: "Đơn hàng", href: "/orders", requiredRole: "admin" },
   { icon: Factory, label: "Sản xuất", href: "/production" },
+  { icon: QrCode, label: "Quét QR", href: "/scan", requiredRole: "worker" },
   { icon: Package, label: "Kho vận", href: "/warehouse", requiredRole: "admin" },
+  { icon: Users, label: "Người dùng", href: "/users", requiredRole: "admin" },
   { icon: Settings, label: "Cài đặt", href: "/settings", requiredRole: "admin" },
 ];
 
