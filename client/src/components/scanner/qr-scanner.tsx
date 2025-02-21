@@ -12,8 +12,15 @@ export function QRScanner({ onScan }: QRScannerProps) {
   useEffect(() => {
     scannerRef.current = new Html5QrcodeScanner(
       "reader",
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      false
+      { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 },
+        formatsToSupport: [ Html5QrcodeScanner.FORMAT_QR_CODE ],
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: true,
+        defaultZoomValueIfSupported: 2
+      },
+      /* verbose= */ false
     );
 
     scannerRef.current.render(
@@ -33,9 +40,9 @@ export function QRScanner({ onScan }: QRScannerProps) {
   }, [onScan]);
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div id="reader" className="w-full max-w-lg mx-auto" />
+    <Card className="w-full max-w-md mx-auto">
+      <CardContent className="p-4">
+        <div id="reader" className="w-full aspect-square" />
       </CardContent>
     </Card>
   );

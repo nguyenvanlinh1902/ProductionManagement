@@ -15,32 +15,51 @@ import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
 
 export default function Scan() {
-  const [selectedStage, setSelectedStage] = useState("");
   const { toast } = useToast();
 
-  const { data: stages } = useQuery({
-    queryKey: ['/api/settings/stages'],
+  // Lấy thông tin người dùng và công đoạn được phân quyền
+  const { data: userStages } = useQuery({
+    queryKey: ['/api/user/stages', auth.currentUser?.uid],
     queryFn: async () => {
-      const doc = await getDoc(doc(db, "settings", "productionStages"));
-      if (doc.exists()) {
-        return doc.data().stages;
+      if (!auth.currentUser?.uid) return [];
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      if (userDoc.exists()) {
+        return userDoc.data().assignedStages || [];
       }
       return [];
     }
   });
 
+  // Lấy danh sách tất cả công đoạn
+  const { data: allStages } = useQuery({
+    queryKey: ['/api/settings/stages'],
+    queryFn: async () => {
+      const stagesDoc = await getDoc(doc(db, "settings", "productionStages"));
+      if (stagesDoc.exists()) {
+        return stagesDoc.data().stages;
+      }
+      return [];
+    }
+  });
+
+  // Lọc ra các công đoạn được phân quyền
+  const availableStages = allStages?.filter(stage => 
+    userStages?.includes(stage.id)
+  ) || [];
+
   const handleScan = async (decodedText: string) => {
     try {
-      if (!selectedStage) {
+      // Kiểm tra quyền truy cập công đoạn
+      if (!userStages?.length) {
         toast({
           title: "Lỗi",
-          description: "Vui lòng chọn công đoạn sản xuất",
+          description: "Bạn chưa được phân công đoạn sản xuất nào",
           variant: "destructive"
         });
         return;
       }
 
-      const orderRef = doc(db, "orders", decodedText);
+      const orderRef = doc(db, "shopify_orders", decodedText);
       const orderDoc = await getDoc(orderRef);
 
       if (!orderDoc.exists()) {
@@ -54,25 +73,29 @@ export default function Scan() {
 
       const orderData = orderDoc.data();
 
-      // Log production progress
-      await addDoc(collection(db, "productionLogs"), {
-        orderId: decodedText,
-        stage: selectedStage,
-        completedAt: new Date(),
-        completedBy: auth.currentUser?.uid
-      });
+      // Tự động cập nhật tất cả công đoạn được phân quyền
+      for (const stageId of userStages) {
+        // Log production progress
+        await addDoc(collection(db, "productionLogs"), {
+          orderId: decodedText,
+          stage: stageId,
+          completedAt: new Date(),
+          completedBy: auth.currentUser?.uid
+        });
 
-      // Update order status
-      await updateDoc(orderRef, {
-        [`stages.${selectedStage}`]: {
-          completed: true,
-          completedAt: new Date().toISOString()
-        }
-      });
+        // Update order status
+        await updateDoc(orderRef, {
+          [`stages.${stageId}`]: {
+            completed: true,
+            completedAt: new Date().toISOString(),
+            completedBy: auth.currentUser?.uid
+          }
+        });
+      }
 
       toast({
         title: "Thành công",
-        description: `Đã cập nhật trạng thái cho đơn hàng ${orderData.orderNumber}`
+        description: `Đã cập nhật trạng thái cho đơn hàng ${orderData.Name}`
       });
     } catch (error) {
       toast({
@@ -84,32 +107,36 @@ export default function Scan() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Quét QR</h1>
+    <div className="container max-w-md mx-auto px-4 py-6">
+      <h1 className="text-2xl font-bold mb-6">Quét QR</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Quét mã QR</CardTitle>
+          <CardTitle>Quét mã QR đơn hàng</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">
-              Chọn công đoạn sản xuất
-            </label>
-            <Select value={selectedStage} onValueChange={setSelectedStage}>
-              <SelectTrigger>
-                <SelectValue placeholder="Chọn công đoạn" />
-              </SelectTrigger>
-              <SelectContent>
-                {stages?.map((stage: any) => (
-                  <SelectItem key={stage.id} value={stage.id}>
-                    {stage.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <QRScanner onScan={handleScan} />
+          {availableStages.length > 0 ? (
+            <div className="space-y-6">
+              <div className="text-sm">
+                Bạn được phân công các công đoạn:
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {availableStages.map(stage => (
+                    <span
+                      key={stage.id}
+                      className="px-2 py-1 bg-primary/10 rounded-full text-xs"
+                    >
+                      {stage.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <QRScanner onScan={handleScan} />
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">
+              Bạn chưa được phân công đoạn sản xuất nào
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

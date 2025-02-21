@@ -19,9 +19,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, PencilIcon } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, getDoc } from "firebase/firestore";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import {
@@ -31,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { register } from "@/lib/firebase";
 
 type UserFormData = {
@@ -45,6 +51,7 @@ export default function Users() {
   const { toast } = useToast();
   const form = useForm<UserFormData>();
 
+  // Lấy danh sách người dùng
   const { data: users, isLoading, refetch } = useQuery({
     queryKey: ['/api/users'],
     queryFn: async () => {
@@ -53,6 +60,19 @@ export default function Users() {
         id: doc.id,
         ...doc.data()
       }));
+    }
+  });
+
+  // Lấy danh sách công đoạn
+  const { data: stages } = useQuery({
+    queryKey: ['/api/settings/stages'],
+    queryFn: async () => {
+      const docRef = doc(db, "settings", "productionStages");
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data().stages;
+      }
+      return [];
     }
   });
 
@@ -78,6 +98,21 @@ export default function Users() {
     }
   });
 
+  const updateUserStages = useMutation({
+    mutationFn: async ({ userId, stages }: { userId: string, stages: string[] }) => {
+      await setDoc(doc(db, "users", userId), {
+        assignedStages: stages
+      }, { merge: true });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Thành công",
+        description: "Đã cập nhật công đoạn cho người dùng"
+      });
+      refetch();
+    }
+  });
+
   const onSubmit = (data: UserFormData) => {
     createUser.mutate(data);
   };
@@ -98,7 +133,7 @@ export default function Users() {
               Thêm người dùng
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Thêm người dùng mới</DialogTitle>
             </DialogHeader>
@@ -175,7 +210,8 @@ export default function Users() {
                 <TableHead>Email</TableHead>
                 <TableHead>Tên</TableHead>
                 <TableHead>Vai trò</TableHead>
-                <TableHead>Trạng thái</TableHead>
+                <TableHead>Công đoạn</TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -185,6 +221,48 @@ export default function Users() {
                   <TableCell>{user.name}</TableCell>
                   <TableCell>
                     {user.role === 'admin' ? 'Quản trị viên' : 'Công nhân'}
+                  </TableCell>
+                  <TableCell>
+                    {user.role === 'worker' && stages && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <PencilIcon className="h-4 w-4 mr-2" />
+                            Phân công
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                          <div className="space-y-4">
+                            <h4 className="font-medium">Phân công công đoạn</h4>
+                            <div className="space-y-2">
+                              {stages.map((stage: any) => (
+                                <div key={stage.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`stage-${stage.id}`}
+                                    checked={user.assignedStages?.includes(stage.id)}
+                                    onCheckedChange={(checked) => {
+                                      const newStages = checked
+                                        ? [...(user.assignedStages || []), stage.id]
+                                        : (user.assignedStages || []).filter((s: string) => s !== stage.id);
+                                      updateUserStages.mutate({
+                                        userId: user.id,
+                                        stages: newStages
+                                      });
+                                    }}
+                                  />
+                                  <label
+                                    htmlFor={`stage-${stage.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {stage.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
