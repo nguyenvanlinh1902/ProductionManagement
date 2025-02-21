@@ -5,19 +5,24 @@ import { auth } from '@/lib/firebase';
 interface NavigationContextType {
   navigate: (path: string) => void;
   currentPath: string;
+  isMobile: boolean;
 }
 
 const NavigationContext = createContext<NavigationContextType | null>(null);
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
+  const isMobile = window.innerWidth < 768;
 
   const navigate = (path: string) => {
-    setLocation(path);
+    // Prevent unnecessary page reloads
+    if (location !== path) {
+      setLocation(path);
+    }
   };
 
   return (
-    <NavigationContext.Provider value={{ navigate, currentPath: location }}>
+    <NavigationContext.Provider value={{ navigate, currentPath: location, isMobile }}>
       {children}
     </NavigationContext.Provider>
   );

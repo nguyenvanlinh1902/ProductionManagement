@@ -2,13 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QRScanner } from "@/components/scanner/qr-scanner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { db } from "@/lib/firebase";
 import { collection, doc, updateDoc, getDoc, addDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";

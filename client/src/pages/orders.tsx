@@ -25,19 +25,20 @@ import { useForm } from "react-hook-form";
 import Papa from 'papaparse';
 import QRCode from "qrcode";
 
-interface CSVRow {
-  Name: string;
-  Email: string;
-  'Lineitem name': string;
-  'Lineitem quantity': string;
-  'Lineitem price': string;
-  'Lineitem sku': string;
-  'Billing Name': string;
-  Phone: string;
-  'Billing Address1': string;
-  Notes: string;
-  'Paid at': string;
-  Total: string;
+interface EmbroideryPosition {
+  name: string;
+  description: string;
+  designFile?: string;
+}
+
+interface Product {
+  name: string;
+  quantity: number;
+  price: number;
+  sku: string;
+  color: string;
+  size: string;
+  embroideryPositions: EmbroideryPosition[];
 }
 
 interface Customer {
@@ -47,12 +48,14 @@ interface Customer {
   address: string;
 }
 
-interface Product {
+interface ProductionStage {
+  id: string;
   name: string;
-  quantity: number;
-  price: number;
-  sku: string;
-  specifications: string;
+  status: 'pending' | 'in_progress' | 'completed';
+  startedAt?: string;
+  completedAt?: string;
+  completedBy?: string;
+  notes?: string;
 }
 
 interface ShopifyOrder {
@@ -60,33 +63,21 @@ interface ShopifyOrder {
   orderNumber: string;
   customer: Customer;
   products: Product[];
+  stages: ProductionStage[];
   status: 'pending' | 'in_production' | 'completed';
   notes: string;
   createdAt: string;
   deadline: string | null;
   total: number;
-  qrCode: string | null; // Added qrCode field
+  qrCode: string | null;
 }
-
-type OrderFormData = {
-  orderNumber: string;
-  customer: string;
-  products: {
-    name: string;
-    quantity: number;
-    specifications: string;
-  }[];
-  deadline: string;
-  notes: string;
-};
 
 export default function Orders() {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
-  const [qrCode, setQrCode] = useState<string | null>(null);
   const { toast } = useToast();
-  const form = useForm<OrderFormData>();
 
+  // Lấy danh sách đơn hàng
   const { data: orders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders'],
     queryFn: async () => {
@@ -95,48 +86,93 @@ export default function Orders() {
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-        qrCode: null // Initialize qrCode to null
+        ...doc.data()
       })) as ShopifyOrder[];
     }
   });
 
+  // Import đơn hàng từ CSV
   const importOrders = useMutation({
     mutationFn: async (file: File) => {
       return new Promise((resolve, reject) => {
-        Papa.parse<CSVRow>(file, {
+        Papa.parse(file, {
           header: true,
           complete: async (results) => {
             try {
               for (const row of results.data) {
-                if (!row.Name || !row.Email) continue;
-
-                const products = [];
-                if (row['Lineitem name']) {
-                  products.push({
-                    name: row['Lineitem name'],
-                    quantity: parseInt(row['Lineitem quantity']) || 1,
-                    price: parseFloat(row['Lineitem price']) || 0,
-                    sku: row['Lineitem sku'] || '',
-                    specifications: ''
-                  });
+                // Xử lý thông tin vị trí thêu từ notes
+                const embroideryPositions: EmbroideryPosition[] = [];
+                if (row.Notes) {
+                  // Parse thông tin vị trí thêu từ note
+                  const positions = row.Notes.split(',').map(pos => ({
+                    name: pos.trim(),
+                    description: '',
+                  }));
+                  embroideryPositions.push(...positions);
                 }
 
+                // Tạo sản phẩm với thông tin chi tiết
+                const product: Product = {
+                  name: row['Lineitem name'] || '',
+                  quantity: parseInt(row['Lineitem quantity']) || 1,
+                  price: parseFloat(row['Lineitem price']) || 0,
+                  sku: row['Lineitem sku'] || '',
+                  color: row['Lineitem properties Color'] || '',
+                  size: row['Lineitem properties Size'] || '',
+                  embroideryPositions
+                };
+
+                // Tạo các công đoạn sản xuất mặc định
+                const stages: ProductionStage[] = [
+                  {
+                    id: 'cutting',
+                    name: 'Cắt',
+                    status: 'pending'
+                  },
+                  {
+                    id: 'sewing',
+                    name: 'May',
+                    status: 'pending'
+                  },
+                  {
+                    id: 'embroidery',
+                    name: 'Thêu',
+                    status: 'pending'
+                  },
+                  {
+                    id: 'finishing',
+                    name: 'Hoàn thiện',
+                    status: 'pending'
+                  },
+                  {
+                    id: 'quality',
+                    name: 'Kiểm tra chất lượng',
+                    status: 'pending'
+                  },
+                  {
+                    id: 'packaging',
+                    name: 'Đóng gói',
+                    status: 'pending'
+                  }
+                ];
+
+                // Tạo đơn hàng mới
                 await addDoc(collection(db, "shopify_orders"), {
                   orderNumber: row.Name,
                   customer: {
-                    email: row.Email,
                     name: row['Billing Name'] || '',
+                    email: row.Email || '',
                     phone: row.Phone || '',
                     address: row['Billing Address1'] || ''
                   },
-                  products,
+                  products: [product],
+                  stages,
                   status: 'pending',
                   notes: row.Notes || '',
                   createdAt: new Date().toISOString(),
                   deadline: row['Paid at'] || null,
                   total: parseFloat(row.Total) || 0,
-                  qrCode: null // Initialize qrCode to null
+                  qrCode: null
                 });
               }
               resolve(true);
@@ -153,7 +189,7 @@ export default function Orders() {
     onSuccess: () => {
       toast({
         title: "Thành công",
-        description: "Đã import đơn hàng"
+        description: "Đã import đơn hàng từ Shopify"
       });
       refetch();
     },
@@ -174,21 +210,24 @@ export default function Orders() {
   };
 
   const handleOrderSelect = async (order: ShopifyOrder) => {
-    setSelectedOrder(order);
     if (!order.qrCode) {
       try {
-        const qrCodeDataUrl = await QRCode.toDataURL(`Order ID: ${order.orderNumber}, Customer: ${order.customer.name}`);
-        const updatedOrder = {...order, qrCode: qrCodeDataUrl};
-        setSelectedOrder(updatedOrder);
+        const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          products: order.products.map(p => ({
+            name: p.name,
+            quantity: p.quantity,
+            embroideryPositions: p.embroideryPositions
+          }))
+        }));
+
+        order.qrCode = qrCodeDataUrl;
       } catch (err) {
         console.error(err);
       }
     }
-  };
-
-  const handleCloseDialog = () => {
-    setSelectedOrder(null);
-    setQrCode(null);
+    setSelectedOrder(order);
   };
 
   if (isLoading) {
@@ -226,12 +265,11 @@ export default function Orders() {
               <TableHead>Mã đơn hàng</TableHead>
               <TableHead>Khách hàng</TableHead>
               <TableHead>Sản phẩm</TableHead>
-              <TableHead>Tổng tiền</TableHead>
               <TableHead>Trạng thái</TableHead>
+              <TableHead>Tiến độ</TableHead>
               <TableHead>Ngày tạo</TableHead>
-              <TableHead>Ngày giao</TableHead>
-              <TableHead>Chi tiết</TableHead>
-              <TableHead>QR Code</TableHead>
+              <TableHead>Hạn giao</TableHead>
+              <TableHead></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -240,18 +278,26 @@ export default function Orders() {
                 <TableCell>{order.orderNumber}</TableCell>
                 <TableCell>
                   <div>
-                    <div>{order.customer?.name || 'Không có tên'}</div>
-                    <div className="text-sm text-muted-foreground">{order.customer?.email || 'Không có email'}</div>
+                    <div className="font-medium">{order.customer?.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {order.customer?.email}
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {order.products?.map((p, index) => (
-                    <div key={index}>
-                      {p.name} x {p.quantity}
+                  {order.products?.map((product, index) => (
+                    <div key={index} className="text-sm">
+                      <div>
+                        {product.name} ({product.size}) x {product.quantity}
+                      </div>
+                      {product.embroideryPositions.length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </TableCell>
-                <TableCell>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.total || 0)}</TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded-full text-xs ${
                     order.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -263,25 +309,45 @@ export default function Orders() {
                      'Chờ xử lý'}
                   </span>
                 </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    {order.stages.map(stage => (
+                      <div key={stage.id} className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          stage.status === 'completed' ? 'bg-green-500' :
+                          stage.status === 'in_progress' ? 'bg-blue-500' :
+                          'bg-gray-300'
+                        }`} />
+                        <span className="text-xs">{stage.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </TableCell>
                 <TableCell>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                <TableCell>{order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : 'Chưa xác định'}</TableCell>
+                <TableCell>
+                  {order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : '-'}
+                </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button onClick={(e) => {
-                      e.stopPropagation();
-                      handleOrderSelect(order);
-                    }} variant="ghost">
-                      <Eye className="h-4 w-4"/>
+                    <Button 
+                      onClick={() => handleOrderSelect(order)} 
+                      variant="ghost" 
+                      size="icon"
+                    >
+                      <Eye className="h-4 w-4" />
                     </Button>
                     {order.qrCode && (
-                      <Button onClick={(e) => {
-                        e.stopPropagation();
-                        const link = document.createElement('a');
-                        link.href = order.qrCode;
-                        link.download = `order-${order.orderNumber}-qr.png`;
-                        link.click();
-                      }} variant="ghost">
-                        <Download className="h-4 w-4"/>
+                      <Button
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = order.qrCode!;
+                          link.download = `order-${order.orderNumber}-qr.png`;
+                          link.click();
+                        }}
+                        variant="ghost"
+                        size="icon"
+                      >
+                        <Download className="h-4 w-4" />
                       </Button>
                     )}
                   </div>
@@ -292,47 +358,106 @@ export default function Orders() {
         </Table>
       </div>
 
-      <Dialog open={selectedOrder !== null} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Chi tiết đơn hàng #{selectedOrder?.orderNumber}</DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-semibold mb-2">Thông tin khách hàng</h3>
-              <div className="space-y-1">
-                <p>Tên: {selectedOrder?.customer?.name}</p>
-                <p>Email: {selectedOrder?.customer?.email}</p>
-                <p>SĐT: {selectedOrder?.customer?.phone}</p>
-                <p>Địa chỉ: {selectedOrder?.customer?.address}</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-2">Mã QR</h3>
-              {selectedOrder?.qrCode && (
-                <img src={selectedOrder.qrCode} alt="QR Code" className="w-32 h-32" />
-              )}
-            </div>
-
-            <div className="col-span-2">
-              <h3 className="font-semibold mb-2">Sản phẩm</h3>
-              <div className="space-y-2">
-                {selectedOrder?.products?.map((product, index) => (
-                  <div key={index} className="flex justify-between border-b pb-2">
-                    <span>{product.name}</span>
-                    <span>x{product.quantity}</span>
+          {selectedOrder && (
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Thông tin khách hàng</h3>
+                  <div className="space-y-1 text-sm">
+                    <p>Tên: {selectedOrder.customer?.name}</p>
+                    <p>Email: {selectedOrder.customer?.email}</p>
+                    <p>SĐT: {selectedOrder.customer?.phone}</p>
+                    <p>Địa chỉ: {selectedOrder.customer?.address}</p>
                   </div>
-                ))}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">Sản phẩm</h3>
+                  {selectedOrder.products?.map((product, index) => (
+                    <div key={index} className="border-t pt-2 first:border-t-0">
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        Màu: {product.color}, Size: {product.size}
+                      </div>
+                      <div className="text-sm">Số lượng: {product.quantity}</div>
+                      {product.embroideryPositions.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-sm font-medium">Vị trí thêu:</div>
+                          <ul className="list-disc list-inside text-sm">
+                            {product.embroideryPositions.map((pos, idx) => (
+                              <li key={idx}>{pos.name}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-semibold mb-2">Mã QR</h3>
+                  {selectedOrder.qrCode && (
+                    <div className="bg-white p-4 rounded-lg">
+                      <img 
+                        src={selectedOrder.qrCode} 
+                        alt="QR Code"
+                        className="w-40 h-40 mx-auto"
+                      />
+                      <Button
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedOrder.qrCode!;
+                          link.download = `order-${selectedOrder.orderNumber}-qr.png`;
+                          link.click();
+                        }}
+                        variant="outline"
+                        className="w-full mt-4"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Tải mã QR
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">Tiến độ sản xuất</h3>
+                  <div className="space-y-2">
+                    {selectedOrder.stages.map(stage => (
+                      <div key={stage.id} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            stage.status === 'completed' ? 'bg-green-500' :
+                            stage.status === 'in_progress' ? 'bg-blue-500' :
+                            'bg-gray-300'
+                          }`} />
+                          <span>{stage.name}</span>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {stage.completedAt ? new Date(stage.completedAt).toLocaleDateString('vi-VN') : '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedOrder.notes && (
+                  <div>
+                    <h3 className="font-semibold mb-2">Ghi chú</h3>
+                    <p className="text-sm">{selectedOrder.notes}</p>
+                  </div>
+                )}
               </div>
             </div>
-
-            <div className="col-span-2">
-              <h3 className="font-semibold mb-2">Ghi chú</h3>
-              <p>{selectedOrder?.notes || 'Không có ghi chú'}</p>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

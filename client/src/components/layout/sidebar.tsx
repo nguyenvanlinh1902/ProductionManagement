@@ -1,21 +1,78 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
-import { useNavigation } from "@/hooks/use-navigation";
-import { useState } from "react";
+import { useNavigation } from "@/contexts/NavigationContext";
+import { useState, useEffect } from "react";
+import { auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
-const menuItems = [
-  { label: "Dashboard", path: "/", icon: "📊" },
-  { label: "Orders", path: "/orders", icon: "📦" },
+interface MenuItem {
+  label: string;
+  path: string;
+  icon: string;
+  requiredRole?: string;
+}
+
+const menuItems: MenuItem[] = [
+  { label: "Dashboard", path: "/dashboard", icon: "📊" },
+  { label: "Orders", path: "/orders", icon: "📦", requiredRole: "admin" },
   { label: "Production", path: "/production", icon: "🏭" },
-  { label: "Warehouse", path: "/warehouse", icon: "🏪" },
-  { label: "Settings", path: "/settings", icon: "⚙️", requiredRole: "admin" },
+  { label: "Scan", path: "/scan", icon: "📱", requiredRole: "worker" },
+  { label: "Settings", path: "/settings", icon: "⚙️", requiredRole: "admin" }
 ];
 
 export function Sidebar() {
-  const { currentPath, navigate } = useNavigation();
+  const { currentPath, navigate, isMobile } = useNavigation();
   const [isOpen, setIsOpen] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserRole(docSnap.data().role);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Filter menu items based on user role
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!item.requiredRole) return true;
+    return userRole === item.requiredRole;
+  });
+
+  // Mobile navigation bar at bottom
+  if (isMobile) {
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50">
+        <div className="grid grid-cols-5 gap-1 p-2">
+          {filteredMenuItems.slice(0, 5).map((item) => (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              className={cn(
+                "flex flex-col items-center justify-center p-2 rounded-lg text-sm",
+                currentPath === item.path
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted"
+              )}
+            >
+              <span className="text-xl mb-1">{item.icon}</span>
+              <span className="text-[10px]">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+    );
+  }
+
+  // Desktop sidebar
   return (
     <>
       <Button 
@@ -33,11 +90,11 @@ export function Sidebar() {
         "md:relative md:flex md:flex-col"
       )}>
         <div className="flex h-16 items-center justify-center border-b px-4">
-          <h2 className="text-lg font-semibold">Management System</h2>
+          <h2 className="text-lg font-semibold">Quản lý sản xuất</h2>
         </div>
 
         <nav className="flex-1 space-y-1 px-2 py-4">
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <button
               key={item.path}
               onClick={() => {

@@ -74,9 +74,11 @@ export const createAdminAccount = async () => {
     // Tạo các công đoạn sản xuất mặc định
     const productionStages = [
       { id: "cutting", name: "Cắt", order: 1 },
-      { id: "assembly", name: "Lắp ráp", order: 2 },
-      { id: "finishing", name: "Hoàn thiện", order: 3 },
-      { id: "quality", name: "Kiểm tra chất lượng", order: 4 }
+      { id: "assembly", name: "May", order: 2 },
+      { id: "embroidery", name: "Thêu", order: 3 },
+      { id: "finishing", name: "Hoàn thiện", order: 4 },
+      { id: "quality", name: "Kiểm tra chất lượng", order: 5 },
+      { id: "packaging", name: "Đóng gói", order: 6 }
     ];
 
     await setDoc(doc(db, "settings", "productionStages"), {

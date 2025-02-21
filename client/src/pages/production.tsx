@@ -1,209 +1,154 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { QRScanner } from "@/components/scanner/qr-scanner";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, getDoc } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TabsList, TabsTrigger, Tabs, TabsContent } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Button } from "@/components/ui/button";
-
-const STAGES = [
-  { id: 'cutting', name: 'Cắt' },
-  { id: 'sewing', name: 'May' },
-  { id: 'packaging', name: 'Đóng gói' }
-];
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function Production() {
-  const [selectedStage, setSelectedStage] = useState("");
-  const { toast } = useToast();
-  const [scannedOrder, setScannedOrder] = useState(null);
-
-  const handleScan = async (orderId: string) => {
-    try {
-      if (!selectedStage) {
-        toast({
-          title: "Lỗi",
-          description: "Vui lòng chọn công đoạn sản xuất",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const orderRef = doc(db, "shopify_orders", orderId);
-      const orderDoc = await getDoc(orderRef);
-
-      if (!orderDoc.exists()) {
-        toast({
-          title: "Lỗi", 
-          description: "Không tìm thấy đơn hàng",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const orderData = orderDoc.data();
-      setScannedOrder(orderData);
-
-      await updateDoc(orderRef, {
-        [`stages.${selectedStage}.completed`]: true,
-        [`stages.${selectedStage}.completedAt`]: new Date(),
-        [`stages.${selectedStage}.completedBy`]: auth.currentUser?.uid
-      });
-
-      toast({
-        title: "Thành công",
-        description: `Đã cập nhật trạng thái ${STAGES.find(s => s.id === selectedStage)?.name}`
-      });
-
-    } catch (error) {
-      console.error(error);
-      toast({
-        title: "Lỗi",
-        description: "Không thể cập nhật trạng thái",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Lấy danh sách công đoạn 
-  const { data: stages } = useQuery({
-    queryKey: ['/api/settings/stages'],
-    queryFn: async () => {
-      const response = await fetch('/api/settings/stages');
-      return response.json();
-    }
-  });
-
   // Lấy đơn hàng đang sản xuất
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ['/api/orders'],
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['/api/orders/in-production'],
     queryFn: async () => {
-      const response = await fetch('/api/orders');
-      const orders = await response.json();
-      return orders.filter(order => order.status === 'in_production');
+      const ordersRef = collection(db, "shopify_orders");
+      const q = query(
+        ordersRef,
+        where("status", "==", "in_production"),
+        orderBy("createdAt", "desc")
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
     }
   });
 
-  // Thống kê sản xuất theo ngày
-  const { data: productionStats } = useQuery({
+  // Lấy thống kê sản xuất theo ngày
+  const { data: productionStats = [] } = useQuery({
     queryKey: ['/api/production/stats'],
     queryFn: async () => {
-      const response = await fetch('/api/production/stats');
-      return response.json();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const logsRef = collection(db, "productionLogs");
+      const q = query(
+        logsRef,
+        where("completedAt", ">=", today.toISOString())
+      );
+      const snapshot = await getDocs(q);
+      const logs = snapshot.docs.map(doc => doc.data());
+
+      // Tổng hợp theo công đoạn
+      const stats = {};
+      logs.forEach(log => {
+        if (!stats[log.stage]) {
+          stats[log.stage] = 0;
+        }
+        stats[log.stage]++;
+      });
+
+      return Object.entries(stats).map(([stage, count]) => ({
+        name: stage === 'cutting' ? 'Cắt' :
+              stage === 'sewing' ? 'May' :
+              stage === 'embroidery' ? 'Thêu' :
+              stage === 'finishing' ? 'Hoàn thiện' :
+              stage === 'quality' ? 'Kiểm tra' :
+              stage === 'packaging' ? 'Đóng gói' : stage,
+        completed: count
+      }));
     }
   });
-
 
   if (isLoading) {
     return <div>Đang tải...</div>;
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <Tabs defaultValue="scan">
+    <div className="space-y-6">
+      <Tabs defaultValue="current">
         <TabsList>
-          <TabsTrigger value="scan">Quét mã QR</TabsTrigger>
-          <TabsTrigger value="report">Báo cáo</TabsTrigger>
+          <TabsTrigger value="current">Đơn hàng đang sản xuất</TabsTrigger>
+          <TabsTrigger value="report">Báo cáo sản xuất</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="scan">
-          <div className="grid gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quét mã QR đơn hàng</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Select value={selectedStage} onValueChange={setSelectedStage}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn công đoạn" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STAGES.map((stage) => (
-                        <SelectItem key={stage.id} value={stage.id}>
-                          {stage.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        <TabsContent value="current">
+          <Card>
+            <CardHeader>
+              <CardTitle>Đơn hàng đang sản xuất</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mã đơn</TableHead>
+                    <TableHead>Sản phẩm</TableHead>
+                    <TableHead>Công đoạn hiện tại</TableHead>
+                    <TableHead>Tiến độ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orders.map((order: any) => {
+                    // Tìm công đoạn hiện tại
+                    const currentStage = order.stages.find(s => s.status === 'in_progress') ||
+                                      order.stages.find(s => s.status === 'pending');
 
-                  <QRScanner onScan={handleScan} />
+                    // Tính % hoàn thành
+                    const completedStages = order.stages.filter(s => s.status === 'completed').length;
+                    const progress = Math.round((completedStages / order.stages.length) * 100);
 
-                  {scannedOrder && (
-                    <div className="mt-4 p-4 border rounded">
-                      <h3 className="font-medium">Thông tin đơn hàng #{scannedOrder.orderNumber}</h3>
-                      <div className="mt-2 space-y-2 text-sm">
-                        <p>Khách hàng: {scannedOrder.customer?.name}</p>
-                        <div className="mt-2">
-                          <p className="font-medium">Sản phẩm:</p>
-                          {scannedOrder.products?.map((product: any, index: number) => (
-                            <div key={index} className="ml-2">
-                              - {product.name} (x{product.quantity})
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>{order.orderNumber}</TableCell>
+                        <TableCell>
+                          {order.products?.map((product, index) => (
+                            <div key={index} className="text-sm">
+                              <div>
+                                {product.name} ({product.size}) x {product.quantity}
+                              </div>
+                              {product.embroideryPositions.length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                                </div>
+                              )}
                             </div>
                           ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Đơn hàng đang sản xuất</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {orders?.map((order: any) => (
-                    <div key={order.id} className="p-4 border rounded space-y-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="font-medium">#{order.orderNumber}</div>
-                          <div className="text-sm text-gray-500">{order.customer?.name}</div>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleDateString('vi-VN')}
-                        </div>
-                      </div>
-
-                      <div className="border-t pt-2">
-                        <div className="font-medium mb-2">Chi tiết đơn hàng:</div>
-                        {order.products?.map((product: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center py-1">
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              <div className="text-sm text-gray-500">
-                                SKU: {product.sku}
-                                {product.specifications && ` | ${product.specifications}`}
-                              </div>
-                            </div>
-                            <div>SL: {product.quantity}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${
+                              currentStage?.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
+                            }`} />
+                            <span>{currentStage?.name}</span>
                           </div>
-                        ))}
-                      </div>
-
-                      {order.notes && (
-                        <div className="text-sm text-gray-600 border-t pt-2">
-                          <span className="font-medium">Ghi chú:</span> {order.notes}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div
+                              className="bg-blue-600 h-2.5 rounded-full"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground mt-1">
+                            {progress}% hoàn thành
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="report">
@@ -212,7 +157,7 @@ export default function Production() {
               <CardTitle>Báo cáo sản xuất hôm nay</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[300px]">
+              <div className="h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={productionStats}>
                     <CartesianGrid strokeDasharray="3 3" />

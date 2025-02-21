@@ -1,0 +1,58 @@
+1 số công việc cần phát triển:
+
+1 - Hệ thống nhận đơn hàng cho khách hàng cần fulfillment (hiện nay khách đang sử dụng tạo đơn trên web shopify & qua Google Sheet). Sau này khách có thể up đơn lên web shopify để quản lý tập trung / có hệ thông quản lý đơn cho khách hàng.
+
+2 - Quản lý sản xuất: Mỗi đơn hàng sẽ có 1 QR Code để sản xuất và theo dõi đến khi đóng gói và giao cho đơn vị vận chuyển.
+
+—-
+Hướng xử lý 1 đơn giản, có thể dùng app up đơn hàng lọat bằng csv lên shopify (https://ezimporter.highviewapps.com/) - chỉ cần set up các trường ánh xạ phù hợp sau đó sẽ up hàng loat đơn hàng của khách lên web shopify thông qua csv.
+
+QUẢN LÝ SẢN XUẤT: 
+Khi khách hàng đặt hàng trên Shopify, đơn sẽ được ghi nhận trong hệ thống.
+Mỗi đơn hàng có thể có:
+Một áo thêu - Một vị trí thêu 🟢 (Đơn giản)
+Nhiều áo thêu - Mỗi áo có 1 vị trí thêu 🟠 (Trung bình)
+Một áo có nhiều vị trí thêu 🔴 (Phức tạp)
+Nhiều áo - Mỗi áo có nhiều vị trí thêu 🔥 (Phức tạp nhất)
+🚀 Giải pháp:
+Sử dụng Custom Fields trên Shopify để lưu thông tin vị trí thêu.
+Tạo mã QR Code đơn hàng chứa toàn bộ dữ liệu cần thiết.
+
+2. Tạo mã QR Code cho sản xuất
+Khi đơn hàng được tạo, hệ thống sẽ tự động tạo QR Code chứa thông tin:
+ID đơn hàng Shopify
+SKU sản phẩm
+Màu sắc, kích cỡ áo
+Vị trí thêu
+File thiết kế (nếu có)
+Trạng thái sản xuất (chưa xử lý / đang thêu / hoàn tất)
+3. Xử lý đơn hàng & sản xuất thêu
+📌 Bước 1: In phiếu sản xuất (Production Sheet)
+Nhân viên in ra phiếu sản xuất từ QR Code, gồm thông tin áo và vị trí thêu.
+Mỗi áo sẽ có một phiếu riêng nếu có nhiều vị trí thêu.
+📌 Bước 2: Chuẩn bị nguyên liệu
+Chọn áo theo màu sắc, kích cỡ.
+Kiểm tra vải, chỉ thêu.
+📌 Bước 3: Tiến hành thêu
+Kỹ thuật viên quét QR Code để nhận thông tin.
+Chạy máy thêu theo vị trí yêu cầu.
+Kiểm tra chất lượng thêu sau mỗi vị trí hoàn thành.
+📌 Bước 4: Cập nhật trạng thái đơn hàng
+Khi áo thêu xong, nhân viên cập nhật trạng thái "Thêu xong" trên hệ thống Shopify/Zapier.
+Nếu áo có nhiều vị trí thêu, mỗi vị trí sẽ có một trạng thái riêng.
+
+4. Kiểm tra & đóng gói
+📌 Bước 1: Kiểm tra chất lượng (QA - Quality Check)
+Kiểm tra chỉ thêu, độ căng của vải, màu sắc có đúng yêu cầu không.
+Cắt chỉ thừa, làm sạch sản phẩm.
+📌 Bước 2: Đóng gói & kiểm tra bằng QR Code
+Quét QR Code để kiểm tra đơn hàng có đủ áo và vị trí thêu hay chưa.
+Nếu đơn hàng có nhiều áo, đảm bảo tất cả áo đều được kiểm tra.
+Dán tem đơn hàng & sẵn sàng xuất kho.
+📌 Bước 3: Cập nhật trạng thái "Đóng gói xong" trên Shopify
+Đơn hàng sẽ chuyển sang trạng thái Ready to Ship.
+Sau đó sẽ quét QR Code để in nhãn Print Code để chuẩn bị giao hàng từ VN qua US.
+Kho US nhận được hàng và quét trạng thái xác nhận đã nhận dc hàng.
+
+
+
