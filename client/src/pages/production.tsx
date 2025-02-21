@@ -13,10 +13,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { ShopifyOrder, ProductionStage } from "@/lib/types";
+
+interface ProductionStats {
+  name: string;
+  completed: number;
+}
+
+interface StageCount {
+  [key: string]: number;
+}
 
 export default function Production() {
   // Lấy đơn hàng đang sản xuất
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: orders = [], isLoading } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders/in-production'],
     queryFn: async () => {
       const ordersRef = collection(db, "shopify_orders");
@@ -29,12 +39,12 @@ export default function Production() {
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as ShopifyOrder[];
     }
   });
 
   // Lấy thống kê sản xuất theo ngày
-  const { data: productionStats = [] } = useQuery({
+  const { data: productionStats = [] } = useQuery<ProductionStats[]>({
     queryKey: ['/api/production/stats'],
     queryFn: async () => {
       const today = new Date();
@@ -49,14 +59,16 @@ export default function Production() {
       const logs = snapshot.docs.map(doc => doc.data());
 
       // Tổng hợp theo công đoạn
-      const stats = {};
+      const stats: StageCount = {};
       logs.forEach(log => {
-        if (!stats[log.stage]) {
-          stats[log.stage] = 0;
+        const stage = log.stage as string;
+        if (!stats[stage]) {
+          stats[stage] = 0;
         }
-        stats[log.stage]++;
+        stats[stage]++;
       });
 
+      // Chuyển đổi sang dạng array cho biểu đồ
       return Object.entries(stats).map(([stage, count]) => ({
         name: stage === 'cutting' ? 'Cắt' :
               stage === 'sewing' ? 'May' :
@@ -98,11 +110,11 @@ export default function Production() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((order: any) => {
-                      const currentStage = order.stages.find(s => s.status === 'in_progress') ||
-                                      order.stages.find(s => s.status === 'pending');
+                    {orders.map((order) => {
+                      const currentStage = order.stages.find((s: ProductionStage) => s.status === 'in_progress') ||
+                                      order.stages.find((s: ProductionStage) => s.status === 'pending');
 
-                      const completedStages = order.stages.filter(s => s.status === 'completed').length;
+                      const completedStages = order.stages.filter((s: ProductionStage) => s.status === 'completed').length;
                       const progress = Math.round((completedStages / order.stages.length) * 100);
 
                       return (

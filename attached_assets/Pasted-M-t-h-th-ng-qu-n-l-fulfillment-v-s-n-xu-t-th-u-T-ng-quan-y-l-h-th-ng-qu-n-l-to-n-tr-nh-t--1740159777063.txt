@@ -1,0 +1,84 @@
+Mô tả hệ thống quản lý fulfillment và sản xuất thêu
+Tổng quan
+Đây là hệ thống quản lý toàn trình từ tiếp nhận đơn hàng đến sản xuất, kiểm tra chất lượng và vận chuyển cho doanh nghiệp chuyên thêu áo. Hệ thống kết nối quy trình từ Việt Nam sang Mỹ.
+Thành phần hệ thống
+1. Module tiếp nhận đơn hàng
+Thay vì sử dụng giải pháp bên thứ ba, hệ thống sẽ có module riêng để:
+
+Nhập đơn hàng qua tệp CSV
+Kết nối trực tiếp với Shopify thông qua API
+Kiểm tra và xác thực dữ liệu trước khi tạo đơn
+Lưu trữ thông tin chi tiết về yêu cầu thêu
+
+2. Hệ thống theo dõi sản xuất dựa trên QR Code
+Mỗi đơn hàng được gán một mã QR chứa:
+
+Mã đơn hàng Shopify
+Thông tin sản phẩm (SKU, màu sắc, kích thước)
+Vị trí thêu
+Liên kết đến file thiết kế
+Trạng thái sản xuất hiện tại
+
+3. Phân loại đơn hàng theo độ phức tạp
+Hệ thống phân loại đơn hàng thành 4 cấp độ:
+
+Đơn giản: Một áo - Một vị trí thêu
+Trung bình: Nhiều áo - Mỗi áo một vị trí thêu
+Phức tạp: Một áo - Nhiều vị trí thêu
+Rất phức tạp: Nhiều áo - Mỗi áo nhiều vị trí thêu
+
+4. Quy trình sản xuất
+Khi đơn hàng được tạo:
+
+Hệ thống tự động tạo mã QR
+Nhân viên in phiếu sản xuất từ mã QR
+Bộ phận kho chuẩn bị nguyên liệu (áo, chỉ thêu)
+Kỹ thuật viên quét QR để nhận thông tin thêu
+Sau khi thêu, nhân viên quét QR để cập nhật trạng thái
+
+5. Kiểm soát chất lượng và đóng gói
+
+Nhân viên QA quét QR để xác nhận kiểm tra
+Ghi lại kết quả kiểm tra và hình ảnh sản phẩm
+Quét QR khi đóng gói để xác nhận đơn đầy đủ
+Cập nhật trạng thái "Ready to Ship" trên Shopify
+
+6. Theo dõi vận chuyển quốc tế
+
+In mã vận đơn từ VN sang US
+Kho tại US quét QR để xác nhận nhận hàng
+Cập nhật trạng thái xuyên suốt quá trình
+
+Cách thức hoạt động
+Đối với đơn hàng đơn giản (một áo - một vị trí thêu):
+
+Nhập đơn từ CSV hoặc tạo trực tiếp trên hệ thống
+Hệ thống tạo một mã QR duy nhất
+In phiếu sản xuất với thông tin vị trí thêu
+Kỹ thuật viên thực hiện thêu và quét QR cập nhật
+QA kiểm tra và xác nhận hoàn thành
+
+Đối với đơn hàng phức tạp (nhiều áo - nhiều vị trí thêu):
+
+Hệ thống tạo QR chính cho đơn hàng
+Tạo các QR con cho từng áo/vị trí thêu
+Mỗi vị trí thêu được theo dõi riêng biệt
+Dashboard hiển thị tiến độ của từng thành phần
+Đơn hàng chỉ hoàn thành khi tất cả QR con được xác nhận
+
+Kiến trúc kỹ thuật
+
+Backend: API services xử lý logic nghiệp vụ
+Frontend: Dashboard quản lý và ứng dụng mobile quét QR
+Database: Lưu trữ thông tin đơn hàng và trạng thái sản xuất
+Integration: Kết nối với Shopify API và dịch vụ vận chuyển
+
+Ưu điểm của hệ thống
+
+Không phụ thuộc vào giải pháp bên thứ ba
+Theo dõi chi tiết từng bước sản xuất
+Xử lý được các đơn hàng phức tạp với nhiều vị trí thêu
+Kiểm soát chất lượng tại mỗi giai đoạn
+Tích hợp xuyên suốt từ đơn hàng đến vận chuyển quốc tế
+
+Hệ thống này giúp doanh nghiệp số hóa toàn bộ quy trình sản xuất thêu, giảm thiểu sai sót, tăng hiệu quả quản lý và nâng cao chất lượng sản phẩm.

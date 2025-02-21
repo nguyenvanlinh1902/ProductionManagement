@@ -7,7 +7,7 @@ const firebaseConfig = {
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
@@ -44,6 +44,7 @@ export const register = async (email: string, password: string, role: string, na
 
     return userCredential;
   } catch (error: any) {
+    console.error('Error in register:', error);
     if (error.code === 'auth/network-request-failed') {
       throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
     }
@@ -63,6 +64,8 @@ export const createAdminAccount = async () => {
       return null;
     }
 
+    console.log('Creating admin account...');
+
     // Tạo tài khoản admin
     const adminCredential = await register(
       "admin@demo.com",
@@ -70,6 +73,8 @@ export const createAdminAccount = async () => {
       "admin",
       "Administrator"
     );
+
+    console.log('Admin account created successfully');
 
     // Tạo các công đoạn sản xuất mặc định
     const productionStages = [
@@ -86,6 +91,8 @@ export const createAdminAccount = async () => {
       updatedAt: new Date().toISOString()
     });
 
+    console.log('Production stages created successfully');
+
     return adminCredential;
   } catch (error: any) {
     console.error('Error creating admin account:', error);
@@ -98,6 +105,7 @@ export const logout = async () => {
   try {
     return await signOut(auth);
   } catch (error: any) {
+    console.error('Error in logout:', error);
     if (error.code === 'auth/network-request-failed') {
       throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
     }
