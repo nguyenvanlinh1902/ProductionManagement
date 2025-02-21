@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { login, createCollection, auth } from "@/lib/firebase";
+import { login } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { FirebaseError } from "firebase/app";
 
@@ -27,27 +26,6 @@ export default function Login() {
       password: "",
     },
   });
-
-  useEffect(() => {
-    // Tạo tài khoản admin mặc định nếu chưa có
-    const createAdminAccount = async () => {
-      try {
-        await login("admin@demo.com", "admin123");
-      } catch (error) {
-        if (error instanceof FirebaseError && error.code === 'auth/user-not-found') {
-          // Nếu chưa có tài khoản admin, tạo mới
-          const userCredential = await auth.createUserWithEmailAndPassword("admin@demo.com", "admin123");
-          await createCollection("users", {
-            uid: userCredential.user.uid,
-            email: "admin@demo.com",
-            role: "admin",
-            name: "Admin"
-          });
-        }
-      }
-    };
-    createAdminAccount();
-  }, []);
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
     try {
