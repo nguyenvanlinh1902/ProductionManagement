@@ -19,7 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useForm } from "react-hook-form";
@@ -28,7 +28,6 @@ import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/
 type StageFormData = {
   id: string;
   name: string;
-  order: number;
 };
 
 export default function Settings() {
@@ -39,9 +38,9 @@ export default function Settings() {
   const { data: stages, isLoading, refetch } = useQuery({
     queryKey: ['/api/settings/stages'],
     queryFn: async () => {
-      const stagesDoc = await getDoc(doc(db, "settings", "productionStages"));
-      if (stagesDoc.exists()) {
-        return stagesDoc.data().stages;
+      const doc = await getDoc(doc(db, "settings", "productionStages"));
+      if (doc.exists()) {
+        return doc.data().stages;
       }
       return [];
     }
@@ -135,7 +134,6 @@ export default function Settings() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]"></TableHead>
                 <TableHead>Mã công đoạn</TableHead>
                 <TableHead>Tên công đoạn</TableHead>
                 <TableHead>Thứ tự</TableHead>
@@ -144,9 +142,6 @@ export default function Settings() {
             <TableBody>
               {stages?.map((stage: any, index: number) => (
                 <TableRow key={stage.id}>
-                  <TableCell>
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                  </TableCell>
                   <TableCell>{stage.id}</TableCell>
                   <TableCell>{stage.name}</TableCell>
                   <TableCell>{index + 1}</TableCell>
