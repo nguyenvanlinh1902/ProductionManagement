@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,18 +78,25 @@ export default function Orders() {
   const { toast } = useToast();
 
   // Lấy danh sách đơn hàng
-  const { data: orders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
-    queryKey: ['/api/orders'],
+  const { data: orders = [], isLoading, error } = useQuery({
+    queryKey: ['orders'],
     queryFn: async () => {
-      const ordersRef = collection(db, "shopify_orders");
-      const q = query(ordersRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ShopifyOrder[];
+      const response = await fetch('/api/orders');
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+      return response.json();
     }
   });
+
+  if (isLoading) {
+    return <div>Đang tải...</div>;
+  }
+
+  if (error) {
+    return <div>Error loading orders: {error.message}</div>;
+  }
+
 
   // Import đơn hàng từ CSV
   const importOrders = useMutation({
@@ -169,7 +176,7 @@ export default function Orders() {
         title: "Thành công",
         description: "Đã import đơn hàng từ Shopify"
       });
-      refetch();
+      //refetch(); //Removed refetch as it's handled by useQuery now
     },
     onError: () => {
       toast({
@@ -207,10 +214,6 @@ export default function Orders() {
     }
     setSelectedOrder(order);
   };
-
-  if (isLoading) {
-    return <div>Đang tải...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -281,12 +284,12 @@ export default function Orders() {
                 <TableCell>
                   <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
                     order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
-                    'bg-yellow-100 text-yellow-800'
+                      order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
                   }`}>
                     {order.status === 'completed' ? 'Hoàn thành' :
-                     order.status === 'in_production' ? 'Đang sản xuất' :
-                     'Chờ xử lý'}
+                      order.status === 'in_production' ? 'Đang sản xuất' :
+                        'Chờ xử lý'}
                   </span>
                 </TableCell>
                 <TableCell>
@@ -295,8 +298,8 @@ export default function Orders() {
                       <div key={stage.id} className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${
                           stage.status === 'completed' ? 'bg-green-500' :
-                          stage.status === 'in_progress' ? 'bg-blue-500' :
-                          'bg-gray-300'
+                            stage.status === 'in_progress' ? 'bg-blue-500' :
+                              'bg-gray-300'
                         }`} />
                         <span className="text-xs whitespace-nowrap">{stage.name}</span>
                       </div>
@@ -311,9 +314,9 @@ export default function Orders() {
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button 
-                      onClick={() => handleOrderSelect(order)} 
-                      variant="ghost" 
+                    <Button
+                      onClick={() => handleOrderSelect(order)}
+                      variant="ghost"
                       size="icon"
                     >
                       <Eye className="h-4 w-4" />
@@ -388,8 +391,8 @@ export default function Orders() {
                   <h3 className="font-semibold mb-2">Mã QR</h3>
                   {selectedOrder.qrCode && (
                     <div className="bg-white p-4 rounded-lg">
-                      <img 
-                        src={selectedOrder.qrCode} 
+                      <img
+                        src={selectedOrder.qrCode}
                         alt="QR Code"
                         className="w-40 h-40 mx-auto"
                       />
@@ -418,8 +421,8 @@ export default function Orders() {
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${
                             stage.status === 'completed' ? 'bg-green-500' :
-                            stage.status === 'in_progress' ? 'bg-blue-500' :
-                            'bg-gray-300'
+                              stage.status === 'in_progress' ? 'bg-blue-500' :
+                                'bg-gray-300'
                           }`} />
                           <span>{stage.name}</span>
                         </div>
