@@ -22,7 +22,7 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/dashboard/stats'],
     queryFn: async () => {
-      const ordersSnapshot = await getDocs(collection(db, "orders"));
+      const ordersSnapshot = await getDocs(collection(db, "shopify_orders"));
       const productsSnapshot = await getDocs(collection(db, "products"));
 
       return {

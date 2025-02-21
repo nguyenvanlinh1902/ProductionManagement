@@ -127,7 +127,7 @@ export default function Production() {
                     <div key={order.id} className="flex justify-between items-center p-2 border rounded">
                       <div>
                         <div className="font-medium">#{order.orderNumber}</div>
-                        <div className="text-sm text-gray-500">{order.customer}</div>
+                        <div className="text-sm text-gray-500">{order.customer?.name}</div>
                       </div>
                     </div>
                   ))}
