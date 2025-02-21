@@ -18,11 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, PlusCircle } from "lucide-react";
+import { Upload, PlusCircle, Download, Eye } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
 import { useForm } from "react-hook-form";
 import Papa from 'papaparse';
+import QRCode from "qrcode";
 
 interface CSVRow {
   Name: string;
@@ -80,6 +81,8 @@ type OrderFormData = {
 
 export default function Orders() {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
+  const [qrCode, setQrCode] = useState<string | null>(null);
   const { toast } = useToast();
   const form = useForm<OrderFormData>();
 
@@ -167,6 +170,18 @@ export default function Orders() {
     }
   };
 
+  const handleOrderSelect = (order: ShopifyOrder) => {
+    setSelectedOrder(order);
+    QRCode.toDataURL(`Order ID: ${order.orderNumber}, Customer: ${order.customer.name}`)
+      .then(url => setQrCode(url))
+      .catch(err => console.error(err));
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedOrder(null);
+    setQrCode(null);
+  };
+
   if (isLoading) {
     return <div>Đang tải...</div>;
   }
@@ -206,6 +221,8 @@ export default function Orders() {
               <TableHead>Trạng thái</TableHead>
               <TableHead>Ngày tạo</TableHead>
               <TableHead>Ngày giao</TableHead>
+              <TableHead>Chi tiết</TableHead>
+              <TableHead>QR Code</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -239,11 +256,56 @@ export default function Orders() {
                 </TableCell>
                 <TableCell>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</TableCell>
                 <TableCell>{order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : 'Chưa xác định'}</TableCell>
+                <TableCell>
+                  <Button onClick={() => handleOrderSelect(order)} variant="ghost" asChild>
+                    <Eye className="h-4 w-4"/>
+                  </Button>
+                </TableCell>
+                <TableCell>
+                  <Button onClick={() => handleOrderSelect(order)} variant="ghost" asChild>
+                    <Download className="h-4 w-4"/>
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
+      <Dialog open={selectedOrder !== null} onOpenChange={handleCloseDialog}>
+        <DialogHeader>
+          <DialogTitle>Chi tiết đơn hàng #{selectedOrder?.orderNumber}</DialogTitle>
+        </DialogHeader>
+        <DialogContent>
+          {/* Display order details here */}
+          <div>
+            <h2>Khách hàng:</h2>
+            <p>Tên: {selectedOrder?.customer.name}</p>
+            <p>Email: {selectedOrder?.customer.email}</p>
+            <p>Điện thoại: {selectedOrder?.customer.phone}</p>
+            <p>Địa chỉ: {selectedOrder?.customer.address}</p>
+          </div>
+          <div>
+            <h2>Sản phẩm:</h2>
+            <ul>
+              {selectedOrder?.products.map((product) => (
+                <li key={product.name}>
+                  {product.name} x {product.quantity}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+              <h2>Tổng tiền:</h2>
+              <p>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(selectedOrder?.total || 0)}</p>
+          </div>
+          {qrCode && (
+            <div>
+              <h2>Mã QR:</h2>
+              <img src={qrCode} alt="QR Code" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
