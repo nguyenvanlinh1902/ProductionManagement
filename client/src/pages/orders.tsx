@@ -21,11 +21,40 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, PlusCircle } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import { useForm } from "react-hook-form";
 import Papa from 'papaparse';
+
+interface CSVRow {
+  Name: string;
+  Email: string;
+  'Lineitem name': string;
+  'Lineitem quantity': string;
+  'Lineitem price': string;
+  'Lineitem sku': string;
+  'Billing Name': string;
+  Phone: string;
+  'Billing Address1': string;
+  Notes: string;
+  'Paid at': string;
+  Total: string;
+}
+
+type OrderFormData = {
+  orderNumber: string;
+  customer: string;
+  products: {
+    name: string;
+    quantity: number;
+    specifications: string;
+  }[];
+  deadline: string;
+  notes: string;
+};
 
 export default function Orders() {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const form = useForm<OrderFormData>();
 
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['/api/orders'],
@@ -43,14 +72,13 @@ export default function Orders() {
   const importOrders = useMutation({
     mutationFn: async (file: File) => {
       return new Promise((resolve, reject) => {
-        Papa.parse(file, {
+        Papa.parse<CSVRow>(file, {
           header: true,
           complete: async (results) => {
             try {
               for (const row of results.data) {
-                if (!row['Name'] || !row['Email']) continue;
+                if (!row.Name || !row.Email) continue;
 
-                // Tạo danh sách sản phẩm từ các cột Lineitem
                 const products = [];
                 if (row['Lineitem name']) {
                   products.push({
@@ -63,19 +91,19 @@ export default function Orders() {
                 }
 
                 await addDoc(collection(db, "orders"), {
-                  orderNumber: row['Name'],
+                  orderNumber: row.Name,
                   customer: {
-                    email: row['Email'],
+                    email: row.Email,
                     name: row['Billing Name'] || '',
-                    phone: row['Phone'] || '',
+                    phone: row.Phone || '',
                     address: row['Billing Address1'] || ''
                   },
                   products,
                   status: 'pending',
-                  notes: row['Notes'] || '',
+                  notes: row.Notes || '',
                   createdAt: new Date().toISOString(),
                   deadline: row['Paid at'] || null,
-                  total: parseFloat(row['Total']) || 0
+                  total: parseFloat(row.Total) || 0
                 });
               }
               resolve(true);
@@ -112,6 +140,10 @@ export default function Orders() {
     }
   };
 
+  const onSubmit = (data: OrderFormData) => {
+    createOrder.mutate(data);
+  };
+
   const createOrder = useMutation({
     mutationFn: async (data: OrderFormData) => {
       await addDoc(collection(db, "orders"), {
@@ -127,20 +159,8 @@ export default function Orders() {
       });
       setIsOpen(false);
       form.reset();
-    },
-    onError: () => {
-      toast({
-        title: "Lỗi",
-        description: "Không thể tạo đơn hàng",
-        variant: "destructive"
-      });
     }
   });
-
-  const { register, handleSubmit, reset } = useForm<OrderFormData>();
-  const onSubmit = (data: OrderFormData) => {
-    createOrder.mutate(data);
-  };
 
   if (isLoading) {
     return <div>Đang tải...</div>;
@@ -174,28 +194,28 @@ export default function Orders() {
                 Tạo đơn hàng
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent>
               <DialogHeader>
                 <DialogTitle>Tạo đơn hàng mới</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div>
-                  <label htmlFor="orderNumber">Mã đơn hàng</label>
-                  <input type="text" id="orderNumber" {...register("orderNumber")} placeholder="Nhập mã đơn hàng" />
+                  <label htmlFor="orderNumber" className="block text-sm font-medium">Mã đơn hàng</label>
+                  <Input type="text" id="orderNumber" {...form.register("orderNumber")} placeholder="Nhập mã đơn hàng" />
                 </div>
                 <div>
-                  <label htmlFor="customer">Khách hàng</label>
-                  <input type="text" id="customer" {...register("customer")} placeholder="Tên khách hàng" />
+                  <label htmlFor="customer" className="block text-sm font-medium">Khách hàng</label>
+                  <Input type="text" id="customer" {...form.register("customer")} placeholder="Tên khách hàng" />
                 </div>
                 <div>
-                  <label htmlFor="deadline">Ngày giao hàng</label>
-                  <input type="date" id="deadline" {...register("deadline")} />
+                  <label htmlFor="deadline" className="block text-sm font-medium">Ngày giao hàng</label>
+                  <Input type="date" id="deadline" {...form.register("deadline")} />
                 </div>
                 <div>
-                  <label htmlFor="notes">Ghi chú</label>
-                  <textarea id="notes" {...register("notes")} placeholder="Nhập ghi chú cho đơn hàng" />
+                  <label htmlFor="notes" className="block text-sm font-medium">Ghi chú</label>
+                  <Input id="notes" {...form.register("notes")} placeholder="Nhập ghi chú cho đơn hàng" />
                 </div>
-                <Button type="submit">Tạo đơn hàng</Button>
+                <Button type="submit" className="w-full">Tạo đơn hàng</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -221,18 +241,18 @@ export default function Orders() {
                 <TableCell>{order.orderNumber}</TableCell>
                 <TableCell>
                   <div>
-                    <div>{order.customer.name}</div>
-                    <div className="text-sm text-muted-foreground">{order.customer.email}</div>
+                    <div>{order.customer?.name}</div>
+                    <div className="text-sm text-muted-foreground">{order.customer?.email}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {order.products.map((p: any, index: number) => (
+                  {order.products?.map((p: any, index: number) => (
                     <div key={index}>
                       {p.name} x {p.quantity}
                     </div>
                   ))}
                 </TableCell>
-                <TableCell>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.total)}</TableCell>
+                <TableCell>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.total || 0)}</TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded-full text-xs ${
                     order.status === 'completed' ? 'bg-green-100 text-green-800' :
@@ -254,15 +274,3 @@ export default function Orders() {
     </div>
   );
 }
-
-type OrderFormData = {
-  orderNumber: string;
-  customer: string;
-  products: {
-    name: string;
-    quantity: number;
-    specifications: string;
-  }[];
-  deadline: string;
-  notes: string;
-};
