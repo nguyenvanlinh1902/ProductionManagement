@@ -49,16 +49,17 @@ export function Sidebar({ userRole }: SidebarProps) {
       <Button 
         variant="ghost" 
         size="icon" 
-        className="fixed right-4 top-4 z-50 md:hidden"
+        className="fixed right-4 bottom-20 z-50 md:hidden"
         onClick={() => setIsOpen(!isOpen)}
       >
         <Menu className="h-6 w-6" />
       </Button>
       <nav
         className={cn(
-          "fixed right-0 top-0 z-40 flex h-screen flex-col gap-4 border-l bg-card p-4 transition-transform duration-200",
-          isOpen ? "translate-x-0" : "translate-x-full",
-          "md:translate-x-0"
+          "fixed md:left-0 bottom-0 md:top-0 z-40 flex md:h-screen flex-row md:flex-col gap-4 md:border-r bg-card p-4 transition-transform duration-200 w-full md:w-64",
+          "md:translate-x-0",
+          isOpen ? "translate-y-0" : "translate-y-full",
+          "md:translate-y-0"
         )}
       >
         <div className="p-6">
