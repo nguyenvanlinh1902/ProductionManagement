@@ -25,6 +25,12 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useForm } from "react-hook-form";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 
+interface Stage {
+  id: string;
+  name: string;
+  order: number;
+}
+
 type StageFormData = {
   id: string;
   name: string;
@@ -35,19 +41,19 @@ export default function Settings() {
   const { toast } = useToast();
   const form = useForm<StageFormData>();
 
-  const { data: stages, isLoading, refetch } = useQuery({
+  const { data: stages = [], isLoading, refetch } = useQuery({
     queryKey: ['/api/settings/stages'],
     queryFn: async () => {
-      const doc = await getDoc(doc(db, "settings", "productionStages"));
-      if (doc.exists()) {
-        return doc.data().stages;
+      const docRef = await getDoc(doc(db, "settings", "productionStages"));
+      if (docRef.exists()) {
+        return (docRef.data()?.stages || []) as Stage[];
       }
-      return [];
+      return [] as Stage[];
     }
   });
 
   const updateStages = useMutation({
-    mutationFn: async (newStages: any[]) => {
+    mutationFn: async (newStages: Stage[]) => {
       await setDoc(doc(db, "settings", "productionStages"), {
         stages: newStages,
         updatedAt: new Date().toISOString()
@@ -65,7 +71,7 @@ export default function Settings() {
   });
 
   const onSubmit = async (data: StageFormData) => {
-    const newStages = [...(stages || [])];
+    const newStages = [...stages];
     newStages.push({
       id: data.id,
       name: data.name,
@@ -140,11 +146,11 @@ export default function Settings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {stages?.map((stage: any, index: number) => (
+              {stages.map((stage: Stage) => (
                 <TableRow key={stage.id}>
                   <TableCell>{stage.id}</TableCell>
                   <TableCell>{stage.name}</TableCell>
-                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{stage.order}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

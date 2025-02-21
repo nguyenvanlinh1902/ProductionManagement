@@ -7,6 +7,7 @@ const firebaseConfig = {
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
@@ -19,26 +20,50 @@ export const db = getFirestore(app);
 
 // Authentication functions
 export const login = async (email: string, password: string) => {
-  return signInWithEmailAndPassword(auth, email, password);
+  try {
+    return await signInWithEmailAndPassword(auth, email, password);
+  } catch (error: any) {
+    if (error.code === 'auth/network-request-failed') {
+      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+    }
+    throw error;
+  }
 };
 
 export const register = async (email: string, password: string, role: string, name: string) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-  // Tạo document trong collection users
-  await setDoc(doc(db, "users", userCredential.user.uid), {
-    email,
-    role,
-    name,
-    createdAt: new Date().toISOString()
-  });
+    // Tạo document trong collection users
+    await setDoc(doc(db, "users", userCredential.user.uid), {
+      email,
+      role,
+      name,
+      createdAt: new Date().toISOString()
+    });
 
-  return userCredential;
+    return userCredential;
+  } catch (error: any) {
+    if (error.code === 'auth/network-request-failed') {
+      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+    }
+    throw error;
+  }
 };
 
 export const createAdminAccount = async () => {
   try {
-    // Thử tạo tài khoản admin
+    // Kiểm tra xem tài khoản admin đã tồn tại chưa
+    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(usersRef);
+    const adminExists = snapshot.docs.some(doc => doc.data().role === "admin");
+
+    if (adminExists) {
+      console.log('Admin account already exists');
+      return null;
+    }
+
+    // Tạo tài khoản admin
     const adminCredential = await register(
       "admin@demo.com",
       "admin123",
@@ -61,31 +86,46 @@ export const createAdminAccount = async () => {
 
     return adminCredential;
   } catch (error: any) {
-    if (error.code === 'auth/email-already-in-use') {
-      console.log('Admin account already exists');
-      return null;
+    console.error('Error creating admin account:', error);
+    // Không throw error ở đây để tránh block luồng khởi tạo app
+    return null;
+  }
+};
+
+export const logout = async () => {
+  try {
+    return await signOut(auth);
+  } catch (error: any) {
+    if (error.code === 'auth/network-request-failed') {
+      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
     }
     throw error;
   }
 };
 
-export const logout = async () => {
-  return signOut(auth);
-};
-
 // Firestore functions
 export const getUserRole = async (uid: string) => {
-  const userDoc = await getDoc(doc(db, "users", uid));
-  if (userDoc.exists()) {
-    return userDoc.data().role;
+  try {
+    const userDoc = await getDoc(doc(db, "users", uid));
+    if (userDoc.exists()) {
+      return userDoc.data().role;
+    }
+    return null;
+  } catch (error: any) {
+    console.error('Error getting user role:', error);
+    return null;
   }
-  return null;
 };
 
 export const getProductionStages = async () => {
-  const stagesDoc = await getDoc(doc(db, "settings", "productionStages"));
-  if (stagesDoc.exists()) {
-    return stagesDoc.data().stages;
+  try {
+    const stagesDoc = await getDoc(doc(db, "settings", "productionStages"));
+    if (stagesDoc.exists()) {
+      return stagesDoc.data().stages;
+    }
+    return [];
+  } catch (error: any) {
+    console.error('Error getting production stages:', error);
+    return [];
   }
-  return [];
 };

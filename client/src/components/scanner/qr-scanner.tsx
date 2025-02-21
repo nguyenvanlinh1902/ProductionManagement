@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface QRScannerProps {
@@ -7,34 +7,37 @@ interface QRScannerProps {
 }
 
 export function QRScanner({ onScan }: QRScannerProps) {
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    scannerRef.current = new Html5QrcodeScanner(
-      "reader",
-      { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        formatsToSupport: [ Html5QrcodeScanner.FORMAT_QR_CODE ],
-        showTorchButtonIfSupported: true,
-        showZoomSliderIfSupported: true,
-        defaultZoomValueIfSupported: 2
-      },
-      /* verbose= */ false
-    );
+    scannerRef.current = new Html5Qrcode("reader");
 
-    scannerRef.current.render(
-      (decodedText) => {
-        onScan(decodedText);
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+    };
+
+    scannerRef.current
+      .start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+          onScan(decodedText);
+        },
+        (error) => {
+          console.error(error);
+        }
+      )
+      .catch((err) => {
+        console.error("Error starting scanner:", err);
+      });
 
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.clear();
+        scannerRef.current
+          .stop()
+          .catch((err) => console.error("Error stopping scanner:", err));
       }
     };
   }, [onScan]);

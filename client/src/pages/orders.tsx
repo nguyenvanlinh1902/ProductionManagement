@@ -39,6 +39,33 @@ interface CSVRow {
   Total: string;
 }
 
+interface Customer {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface Product {
+  name: string;
+  quantity: number;
+  price: number;
+  sku: string;
+  specifications: string;
+}
+
+interface ShopifyOrder {
+  id: string;
+  orderNumber: string;
+  customer: Customer;
+  products: Product[];
+  status: 'pending' | 'in_production' | 'completed';
+  notes: string;
+  createdAt: string;
+  deadline: string | null;
+  total: number;
+}
+
 type OrderFormData = {
   orderNumber: string;
   customer: string;
@@ -56,16 +83,16 @@ export default function Orders() {
   const { toast } = useToast();
   const form = useForm<OrderFormData>();
 
-  const { data: orders, isLoading, refetch } = useQuery({
+  const { data: orders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders'],
     queryFn: async () => {
-      const ordersRef = collection(db, "orders");
+      const ordersRef = collection(db, "shopify_orders");
       const q = query(ordersRef, orderBy("createdAt", "desc"));
       const snapshot = await getDocs(q);
       return snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as ShopifyOrder[];
     }
   });
 
@@ -90,7 +117,7 @@ export default function Orders() {
                   });
                 }
 
-                await addDoc(collection(db, "orders"), {
+                await addDoc(collection(db, "shopify_orders"), {
                   orderNumber: row.Name,
                   customer: {
                     email: row.Email,
@@ -140,28 +167,6 @@ export default function Orders() {
     }
   };
 
-  const onSubmit = (data: OrderFormData) => {
-    createOrder.mutate(data);
-  };
-
-  const createOrder = useMutation({
-    mutationFn: async (data: OrderFormData) => {
-      await addDoc(collection(db, "orders"), {
-        ...data,
-        status: "pending",
-        createdAt: new Date().toISOString()
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Thành công",
-        description: "Đã tạo đơn hàng mới"
-      });
-      setIsOpen(false);
-      form.reset();
-    }
-  });
-
   if (isLoading) {
     return <div>Đang tải...</div>;
   }
@@ -187,38 +192,6 @@ export default function Orders() {
               </span>
             </Button>
           </label>
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Tạo đơn hàng
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Tạo đơn hàng mới</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div>
-                  <label htmlFor="orderNumber" className="block text-sm font-medium">Mã đơn hàng</label>
-                  <Input type="text" id="orderNumber" {...form.register("orderNumber")} placeholder="Nhập mã đơn hàng" />
-                </div>
-                <div>
-                  <label htmlFor="customer" className="block text-sm font-medium">Khách hàng</label>
-                  <Input type="text" id="customer" {...form.register("customer")} placeholder="Tên khách hàng" />
-                </div>
-                <div>
-                  <label htmlFor="deadline" className="block text-sm font-medium">Ngày giao hàng</label>
-                  <Input type="date" id="deadline" {...form.register("deadline")} />
-                </div>
-                <div>
-                  <label htmlFor="notes" className="block text-sm font-medium">Ghi chú</label>
-                  <Input id="notes" {...form.register("notes")} placeholder="Nhập ghi chú cho đơn hàng" />
-                </div>
-                <Button type="submit" className="w-full">Tạo đơn hàng</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
@@ -236,17 +209,17 @@ export default function Orders() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {orders?.map((order: any) => (
+            {orders.map((order) => (
               <TableRow key={order.id}>
                 <TableCell>{order.orderNumber}</TableCell>
                 <TableCell>
                   <div>
-                    <div>{order.customer?.name}</div>
+                    <div>{order.customer?.name || 'Không có tên'}</div>
                     <div className="text-sm text-muted-foreground">{order.customer?.email}</div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {order.products?.map((p: any, index: number) => (
+                  {order.products?.map((p, index) => (
                     <div key={index}>
                       {p.name} x {p.quantity}
                     </div>
