@@ -33,13 +33,14 @@ export function QRScanner({ onScan }: QRScannerProps) {
         }
       )
       .catch((err) => {
-        console.error("Error starting scanner:", err);
-        if (err.message.includes("Requested device not found")) {
-          setError("Không tìm thấy thiết bị camera. Vui lòng kiểm tra quyền truy cập camera của trình duyệt.");
-        } else {
-          setError("Lỗi khởi chạy máy quét mã QR. Vui lòng thử lại.");
-        }
-      });
+          console.error("Error starting scanner:", err);
+          const errorMessage = err?.message || String(err);
+          if (errorMessage.includes("Requested device not found")) {
+            setError("Không tìm thấy thiết bị camera. Vui lòng kiểm tra quyền truy cập camera của trình duyệt.");
+          } else {
+            setError("Lỗi khởi chạy máy quét mã QR. Vui lòng thử lại.");
+          }
+        });
 
     return () => {
       if (scannerRef.current) {
