@@ -8,31 +8,35 @@ interface QRScannerProps {
 }
 
 export function QRScanner({ onScan }: QRScannerProps) {
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    scannerRef.current = new Html5Qrcode("reader");
+    if (!containerRef.current) return;
 
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
-      formatsToSupport: [Html5Qrcode.DEFAULT_SUPPORTED_FORMATS[0]], // Only support QR code format
-    };
+    const containerId = 'qr-reader';
+    const container = document.createElement('div');
+    container.id = containerId;
+    containerRef.current.appendChild(container);
+
+    scannerRef.current = new Html5Qrcode(containerId);
 
     scannerRef.current
       .start(
-        { facingMode: "environment" },
-        config,
-        (decodedText) => {
-          onScan(decodedText);
-          setError(null); // Clear error on successful scan
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
         },
-        (error) => {
-          console.error("QR Code scan error:", error);
-          setError("Lỗi quét mã QR. Vui lòng kiểm tra camera và kết nối.");
-        }
+        (decodedText) => {
+          if (typeof onScan === 'function') {
+            onScan(decodedText);
+          }
+        },
+        (errorMessage) => {
+          console.warn(`QR Error: ${errorMessage}`);
+        },
       )
       .catch((err) => {
         console.error("Error starting scanner:", err);
@@ -50,14 +54,18 @@ export function QRScanner({ onScan }: QRScannerProps) {
           .stop()
           .catch((err) => console.error("Error stopping scanner:", err));
       }
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
     };
   }, [onScan]);
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardContent className="p-4">
-        <div id="reader" className="w-full aspect-square" />
-        {error && <p className="text-red-500 mt-2">{error}</p>}
+    <Card>
+      <CardContent className="p-6">
+        <div ref={containerRef} className="w-full">
+          {error && <div className="text-red-500 text-sm mb-4">{error}</div>}
+        </div>
       </CardContent>
     </Card>
   );
