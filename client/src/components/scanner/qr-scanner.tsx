@@ -17,6 +17,7 @@ export function QRScanner({ onScan }: QRScannerProps) {
       fps: 10,
       qrbox: { width: 250, height: 250 },
       aspectRatio: 1.0,
+      formatsToSupport: [Html5Qrcode.DEFAULT_SUPPORTED_FORMATS[0]], // Only support QR code format
     };
 
     scannerRef.current
@@ -43,10 +44,11 @@ export function QRScanner({ onScan }: QRScannerProps) {
         });
 
     return () => {
-      if (scannerRef.current) {
+      if (scannerRef.current?.isScanning) {
         scannerRef.current
           .stop()
           .catch((err) => console.error("Error stopping scanner:", err));
+      }anner:", err));
       }
     };
   }, [onScan]);
