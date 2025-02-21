@@ -99,7 +99,9 @@ export default function Orders() {
           header: true,
           complete: async (results) => {
             try {
-              for (const row of results.data) {
+              for (const row of results.data as any[]) {
+                if (!row.Name || !row.Email) continue;
+
                 // Xử lý thông tin vị trí thêu từ notes
                 const embroideryPositions: EmbroideryPosition[] = [];
                 if (row.Notes) {
@@ -119,41 +121,17 @@ export default function Orders() {
                   sku: row['Lineitem sku'] || '',
                   color: row['Lineitem properties Color'] || '',
                   size: row['Lineitem properties Size'] || '',
-                  embroideryPositions
+                  embroideryPositions: embroideryPositions
                 };
 
                 // Tạo các công đoạn sản xuất mặc định
                 const stages: ProductionStage[] = [
-                  {
-                    id: 'cutting',
-                    name: 'Cắt',
-                    status: 'pending'
-                  },
-                  {
-                    id: 'sewing',
-                    name: 'May',
-                    status: 'pending'
-                  },
-                  {
-                    id: 'embroidery',
-                    name: 'Thêu',
-                    status: 'pending'
-                  },
-                  {
-                    id: 'finishing',
-                    name: 'Hoàn thiện',
-                    status: 'pending'
-                  },
-                  {
-                    id: 'quality',
-                    name: 'Kiểm tra chất lượng',
-                    status: 'pending'
-                  },
-                  {
-                    id: 'packaging',
-                    name: 'Đóng gói',
-                    status: 'pending'
-                  }
+                  { id: 'cutting', name: 'Cắt', status: 'pending' },
+                  { id: 'sewing', name: 'May', status: 'pending' },
+                  { id: 'embroidery', name: 'Thêu', status: 'pending' },
+                  { id: 'finishing', name: 'Hoàn thiện', status: 'pending' },
+                  { id: 'quality', name: 'Kiểm tra chất lượng', status: 'pending' },
+                  { id: 'packaging', name: 'Đóng gói', status: 'pending' }
                 ];
 
                 // Tạo đơn hàng mới
@@ -236,10 +214,10 @@ export default function Orders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Đơn hàng</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">Đơn hàng</h1>
 
-        <div className="flex gap-2">
+        <div className="w-full sm:w-auto">
           <Input
             type="file"
             accept=".csv"
@@ -247,8 +225,8 @@ export default function Orders() {
             className="hidden"
             id="csv-upload"
           />
-          <label htmlFor="csv-upload">
-            <Button variant="outline" asChild>
+          <label htmlFor="csv-upload" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto" asChild>
               <span>
                 <Upload className="mr-2 h-4 w-4" />
                 Import CSV
@@ -258,48 +236,50 @@ export default function Orders() {
         </div>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Mã đơn hàng</TableHead>
-              <TableHead>Khách hàng</TableHead>
-              <TableHead>Sản phẩm</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead>Tiến độ</TableHead>
-              <TableHead>Ngày tạo</TableHead>
-              <TableHead>Hạn giao</TableHead>
-              <TableHead></TableHead>
+              <TableHead className="whitespace-nowrap">Mã đơn</TableHead>
+              <TableHead className="whitespace-nowrap">Khách hàng</TableHead>
+              <TableHead className="whitespace-nowrap">Sản phẩm</TableHead>
+              <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
+              <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
+              <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
+              <TableHead className="whitespace-nowrap">Hạn giao</TableHead>
+              <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>
-                <TableCell>{order.orderNumber}</TableCell>
+                <TableCell className="font-medium">{order.orderNumber}</TableCell>
                 <TableCell>
-                  <div>
-                    <div className="font-medium">{order.customer?.name}</div>
-                    <div className="text-sm text-muted-foreground">
+                  <div className="min-w-[180px]">
+                    <div className="font-medium truncate">{order.customer?.name}</div>
+                    <div className="text-sm text-muted-foreground truncate">
                       {order.customer?.email}
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {order.products?.map((product, index) => (
-                    <div key={index} className="text-sm">
-                      <div>
-                        {product.name} ({product.size}) x {product.quantity}
-                      </div>
-                      {product.embroideryPositions.length > 0 && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                  <div className="min-w-[200px]">
+                    {order.products?.map((product, index) => (
+                      <div key={index} className="text-sm">
+                        <div className="truncate">
+                          {product.name} ({product.size || 'N/A'}) x {product.quantity}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {product.embroideryPositions && product.embroideryPositions.length > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1 truncate">
+                            Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </TableCell>
                 <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
+                  <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
                     order.status === 'completed' ? 'bg-green-100 text-green-800' :
                     order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
                     'bg-yellow-100 text-yellow-800'
@@ -310,7 +290,7 @@ export default function Orders() {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="space-y-1">
+                  <div className="min-w-[150px] space-y-1">
                     {order.stages.map(stage => (
                       <div key={stage.id} className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${
@@ -318,13 +298,15 @@ export default function Orders() {
                           stage.status === 'in_progress' ? 'bg-blue-500' :
                           'bg-gray-300'
                         }`} />
-                        <span className="text-xs">{stage.name}</span>
+                        <span className="text-xs whitespace-nowrap">{stage.name}</span>
                       </div>
                     ))}
                   </div>
                 </TableCell>
-                <TableCell>{new Date(order.createdAt).toLocaleDateString('vi-VN')}</TableCell>
-                <TableCell>
+                <TableCell className="whitespace-nowrap">
+                  {new Date(order.createdAt).toLocaleDateString('vi-VN')}
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
                   {order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : '-'}
                 </TableCell>
                 <TableCell>
@@ -383,10 +365,10 @@ export default function Orders() {
                     <div key={index} className="border-t pt-2 first:border-t-0">
                       <div className="font-medium">{product.name}</div>
                       <div className="text-sm text-muted-foreground">
-                        Màu: {product.color}, Size: {product.size}
+                        Màu: {product.color || 'N/A'}, Size: {product.size || 'N/A'}
                       </div>
                       <div className="text-sm">Số lượng: {product.quantity}</div>
-                      {product.embroideryPositions.length > 0 && (
+                      {product.embroideryPositions && product.embroideryPositions.length > 0 && (
                         <div className="mt-2">
                           <div className="text-sm font-medium">Vị trí thêu:</div>
                           <ul className="list-disc list-inside text-sm">

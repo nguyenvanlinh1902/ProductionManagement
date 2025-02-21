@@ -76,9 +76,9 @@ export default function Production() {
   return (
     <div className="space-y-6">
       <Tabs defaultValue="current">
-        <TabsList>
-          <TabsTrigger value="current">Đơn hàng đang sản xuất</TabsTrigger>
-          <TabsTrigger value="report">Báo cáo sản xuất</TabsTrigger>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="current" className="flex-1 sm:flex-none">Đơn hàng đang sản xuất</TabsTrigger>
+          <TabsTrigger value="report" className="flex-1 sm:flex-none">Báo cáo sản xuất</TabsTrigger>
         </TabsList>
 
         <TabsContent value="current">
@@ -86,67 +86,71 @@ export default function Production() {
             <CardHeader>
               <CardTitle>Đơn hàng đang sản xuất</CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã đơn</TableHead>
-                    <TableHead>Sản phẩm</TableHead>
-                    <TableHead>Công đoạn hiện tại</TableHead>
-                    <TableHead>Tiến độ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {orders.map((order: any) => {
-                    // Tìm công đoạn hiện tại
-                    const currentStage = order.stages.find(s => s.status === 'in_progress') ||
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="whitespace-nowrap">Mã đơn</TableHead>
+                      <TableHead className="whitespace-nowrap">Sản phẩm</TableHead>
+                      <TableHead className="whitespace-nowrap">Công đoạn</TableHead>
+                      <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orders.map((order: any) => {
+                      const currentStage = order.stages.find(s => s.status === 'in_progress') ||
                                       order.stages.find(s => s.status === 'pending');
 
-                    // Tính % hoàn thành
-                    const completedStages = order.stages.filter(s => s.status === 'completed').length;
-                    const progress = Math.round((completedStages / order.stages.length) * 100);
+                      const completedStages = order.stages.filter(s => s.status === 'completed').length;
+                      const progress = Math.round((completedStages / order.stages.length) * 100);
 
-                    return (
-                      <TableRow key={order.id}>
-                        <TableCell>{order.orderNumber}</TableCell>
-                        <TableCell>
-                          {order.products?.map((product, index) => (
-                            <div key={index} className="text-sm">
-                              <div>
-                                {product.name} ({product.size}) x {product.quantity}
-                              </div>
-                              {product.embroideryPositions.length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                      return (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                          <TableCell>
+                            <div className="min-w-[200px]">
+                              {order.products?.map((product, index) => (
+                                <div key={index} className="text-sm">
+                                  <div className="truncate">
+                                    {product.name} ({product.size || 'N/A'}) x {product.quantity}
+                                  </div>
+                                  {product.embroideryPositions && product.embroideryPositions.length > 0 && (
+                                    <div className="text-xs text-muted-foreground mt-1 truncate">
+                                      Vị trí thêu: {product.embroideryPositions.map(p => p.name).join(', ')}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              ))}
                             </div>
-                          ))}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${
-                              currentStage?.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
-                            }`} />
-                            <span>{currentStage?.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                              className="bg-blue-600 h-2.5 rounded-full"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground mt-1">
-                            {progress}% hoàn thành
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 min-w-[120px]">
+                              <div className={`w-2 h-2 rounded-full ${
+                                currentStage?.status === 'in_progress' ? 'bg-blue-500' : 'bg-gray-300'
+                              }`} />
+                              <span className="whitespace-nowrap">{currentStage?.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-[150px]">
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                  className="bg-blue-600 h-2.5 rounded-full"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground mt-1">
+                                {progress}% hoàn thành
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
