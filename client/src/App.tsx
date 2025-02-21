@@ -12,6 +12,7 @@ import Orders from "@/pages/orders";
 import Production from "@/pages/production";
 import Warehouse from "@/pages/warehouse";
 import NotFound from "@/pages/not-found";
+import Settings from "@/pages/settings"; // Import the Settings component
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -101,6 +102,11 @@ function Router() {
           <Warehouse />
         </PrivateRoute>
       </Route>
+      <Route path="/settings"> {/* Added route for Settings */}
+        <PrivateRoute requiredRole="admin">
+          <Settings />
+        </PrivateRoute>
+      </Route> {/* Added route for Settings */}
       <Route component={NotFound} />
     </Switch>
   );
