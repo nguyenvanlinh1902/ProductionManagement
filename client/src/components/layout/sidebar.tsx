@@ -8,10 +8,12 @@ import {
   Users,
   QrCode,
   LogOut,
+  Menu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/firebase";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { useState } from "react";
 
 interface MenuItem {
   icon: any;
@@ -36,6 +38,7 @@ interface SidebarProps {
 
 export function Sidebar({ userRole }: SidebarProps) {
   const { currentPath, navigate } = useNavigation();
+  const [isOpen, setIsOpen] = useState(true);
 
   const filteredMenuItems = menuItems.filter(
     item => !item.requiredRole || item.requiredRole === userRole
@@ -43,18 +46,31 @@ export function Sidebar({ userRole }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex h-screen w-64 bg-sidebar border-r border-border flex-col">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="fixed right-4 top-4 z-50 md:hidden"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <Menu className="h-6 w-6" />
+      </Button>
+      <nav
+        className={cn(
+          "fixed right-0 top-0 z-40 flex h-screen flex-col gap-4 border-l bg-card p-4 transition-transform duration-200",
+          isOpen ? "translate-x-0" : "translate-x-full",
+          "md:translate-x-0"
+        )}
+      >
         <div className="p-6">
           <h1 className="text-xl font-bold text-sidebar-foreground">Quản lý Sản xuất</h1>
         </div>
-        <nav className="flex-1 px-4">
+        <div className="flex-1 px-4">
           {filteredMenuItems.map((item) => (
             <div
               key={item.href}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-md text-sidebar-foreground hover:bg-sidebar-accent mt-1 cursor-pointer",
-                currentPath === item.href && "bg-sidebar-accent"
+                currentPath === item.href && "bg-primary text-primary-foreground font-medium shadow-md"
               )}
               onClick={() => navigate(item.href)}
             >
@@ -62,7 +78,7 @@ export function Sidebar({ userRole }: SidebarProps) {
               <span>{item.label}</span>
             </div>
           ))}
-        </nav>
+        </div>
         <div className="p-4">
           <Button
             variant="ghost"
@@ -73,26 +89,7 @@ export function Sidebar({ userRole }: SidebarProps) {
             Đăng xuất
           </Button>
         </div>
-      </div>
-
-      {/* Mobile Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border">
-        <nav className="flex justify-around py-2">
-          {filteredMenuItems.map((item) => (
-            <button
-              key={item.href}
-              className={cn(
-                "flex flex-col items-center p-2 rounded-md",
-                currentPath === item.href && "text-primary"
-              )}
-              onClick={() => navigate(item.href)}
-            >
-              <item.icon className="h-5 w-5" />
-              <span className="text-xs mt-1">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
+      </nav>
     </>
   );
 }
