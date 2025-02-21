@@ -1,0 +1,98 @@
+ng dụng Quản lý Quy trình Sản xuất và Kho vận
+1. Tổng quan hệ thống
+Ứng dụng web được xây dựng bằng React và Firebase, cho phép quản lý toàn bộ quy trình từ nhập đơn hàng, theo dõi sản xuất đến xuất kho, sử dụng công nghệ QR code và BarCode để theo dõi.
+2. Kiến trúc Firebase
+2.1. Firebase Authentication
+
+Xác thực người dùng bằng email/password
+Quản lý phân quyền người dùng (Admin, Nhân viên sản xuất, Nhân viên kho)
+Tích hợp xác thực trên cả web và mobile
+
+2.2. Cloud Firestore
+Collections:
+
+users: Thông tin người dùng và phân quyền
+orders: Đơn hàng và thông tin QR code
+products: Thông tin sản phẩm và BarCode
+production_stages: Các công đoạn sản xuất
+production_logs: Log quét QR theo công đoạn
+shipping_logs: Log xuất kho và vận chuyển
+
+2.3. Firebase Storage
+
+Lưu trữ file import đơn hàng
+Lưu trữ hình ảnh QR code và BarCode
+Backup dữ liệu quan trọng
+
+2.4. Firebase Hosting
+
+Deploy ứng dụng web React
+Cấu hình SSL tự động
+CDN toàn cầu
+
+2.5. Firebase Cloud Functions
+
+Tự động tạo QR code khi import đơn hàng
+Xử lý real-time notifications
+Tự động backup dữ liệu
+
+3. Chức năng chính
+[Giữ nguyên các phần 2.1 đến 2.5 từ version trước]
+4. Yêu cầu kỹ thuật
+4.1. Frontend
+
+React.js framework
+Firebase SDK for Web
+React Firebase Hooks
+QR/BarCode scanning libraries
+Material-UI hoặc Tailwind CSS
+
+4.2. Firebase Backend
+
+Security Rules cho Firestore và Storage
+Cloud Functions cho business logic
+Realtime Database cho tracking
+Firebase Analytics cho monitoring
+
+4.3. Mobile Integration
+
+React Native Firebase
+Camera API cho quét mã
+Push Notifications
+
+5. Bảo mật
+
+Firebase Authentication với role-based access
+Firestore Security Rules theo role
+Storage Security Rules
+Validate dữ liệu ở client và server
+
+6. Quy trình làm việc
+[Giữ nguyên từ version trước]
+7. Báo cáo và thống kê
+
+Firebase Analytics integration
+Custom Analytics Events
+Export data cho reporting
+Real-time monitoring dashboard
+
+8. Deployment
+
+CI/CD với Firebase Hosting
+Environment separation (Dev/Staging/Prod)
+Automatic backups
+Performance monitoring
+
+9. Ước tính chi phí Firebase
+Spark Plan (Free Tier):
+
+Authentication: 10K/tháng
+Hosting: 10GB/tháng
+Cloud Firestore: 1GB storage, 10GB/tháng transfer
+Cloud Functions: 125K/tháng
+
+Blaze Plan (Pay as you go):
+
+Tính phí theo usage
+Đề xuất budget alerts
+Optimize costs với caching và indexing
