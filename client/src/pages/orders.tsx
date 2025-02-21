@@ -89,15 +89,6 @@ export default function Orders() {
     }
   });
 
-  if (isLoading) {
-    return <div>Đang tải...</div>;
-  }
-
-  if (error) {
-    return <div>Error loading orders: {error.message}</div>;
-  }
-
-
   // Import đơn hàng từ CSV
   const importOrders = useMutation({
     mutationFn: async (file: File) => {
