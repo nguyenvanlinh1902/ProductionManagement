@@ -241,7 +241,7 @@ export default function Orders() {
                 <TableCell>
                   <div>
                     <div>{order.customer?.name || 'Không có tên'}</div>
-                    <div className="text-sm text-muted-foreground">{order.customer?.email}</div>
+                    <div className="text-sm text-muted-foreground">{order.customer?.email || 'Không có email'}</div>
                   </div>
                 </TableCell>
                 <TableCell>

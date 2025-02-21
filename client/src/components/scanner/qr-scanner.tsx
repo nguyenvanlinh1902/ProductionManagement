@@ -35,7 +35,10 @@ export function QRScanner({ onScan }: QRScannerProps) {
           }
         },
         (errorMessage) => {
-          console.warn(`QR Error: ${errorMessage}`);
+          // Ignore non-critical warnings
+          if (!errorMessage.includes('QR code not found')) {
+            console.warn(`QR Error: ${errorMessage}`);
+          }
         },
       )
       .catch((err) => {
