@@ -238,20 +238,10 @@ export default function Shopify() {
         await testShopifyConnection();
 
         // Fetch orders
-        const apiUrl = getShopifyApiUrl(
-          `/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any&limit=250`,
-        );
-        console.log("Fetching orders from:", apiUrl);
+        console.log("Fetching orders from: /api/shopify/orders");
 
-        const response = await fetch(apiUrl, {
-          method: "GET",
-          headers: {
-            "X-Shopify-Access-Token":
-              import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim(),
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        });
+        const response = await fetch('/api/shopify/orders');
+
 
         console.log("Response status:", response.status);
 
