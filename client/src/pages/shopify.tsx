@@ -38,7 +38,12 @@ const validateShopifyCredentials = () => {
 
 // Format store URL correctly
 const getShopifyApiUrl = (endpoint: string) => {
-  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  if (!import.meta.env.VITE_SHOPIFY_STORE_URL) {
+    throw new Error('VITE_SHOPIFY_STORE_URL is not defined');
+  }
+  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL.trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
   return `https://${storeUrl}${endpoint}`;
 };
 
@@ -52,9 +57,12 @@ const testShopifyConnection = async () => {
 
     const response = await fetch(apiUrl, {
       headers: {
-        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
+        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN || '',
         'Content-Type': 'application/json'
       }
+    }).catch(err => {
+      console.error('Fetch error:', err);
+      throw new Error('Không thể kết nối tới Shopify API. Vui lòng kiểm tra kết nối mạng và cấu hình.');
     });
 
     if (!response.ok) {
