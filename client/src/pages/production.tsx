@@ -32,14 +32,24 @@ export default function Production() {
       const ordersRef = collection(db, "shopify_orders");
       const q = query(
         ordersRef,
-        where("status", "==", "in_production"),
+        where("status", "in", ["pending", "in_production"]),
         orderBy("createdAt", "desc")
       );
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ShopifyOrder[];
+      
+      return snapshot.docs.map(doc => {
+        const order = doc.data();
+        // Filter products that haven't been manufactured
+        const pendingProducts = order.products.filter(product => 
+          !product.manufactured || product.manufactured === false
+        );
+        
+        return {
+          id: doc.id,
+          ...order,
+          products: pendingProducts
+        };
+      }).filter(order => order.products.length > 0) as ShopifyOrder[];
     }
   });
 
