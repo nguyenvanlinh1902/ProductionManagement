@@ -52,18 +52,21 @@ const testShopifyConnection = async () => {
   try {
     console.log('Testing Shopify connection...');
 
-    if (!import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN) {
+    const accessToken = import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim();
+    const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL?.trim();
+
+    if (!accessToken) {
       throw new Error('Chưa cấu hình Access Token Shopify');
     }
 
-    if (!import.meta.env.VITE_SHOPIFY_STORE_URL) {
+    if (!storeUrl) {
       throw new Error('Chưa cấu hình URL cửa hàng Shopify');
     }
 
-    // Validate and format store URL
-    let storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL;
-    if (!storeUrl.includes('.myshopify.com')) {
-      throw new Error('URL cửa hàng phải có định dạng xxx.myshopify.com');
+    // Validate store URL format
+    const urlPattern = /^[a-zA-Z0-9-]+\.myshopify\.com$/;
+    if (!urlPattern.test(storeUrl)) {
+      throw new Error('URL cửa hàng phải có định dạng xxx.myshopify.com (không cần https://)');
     }
     
     // Đảm bảo URL đúng định dạng
@@ -72,11 +75,12 @@ const testShopifyConnection = async () => {
       .replace(/\/$/, '')            // Xóa dấu / cuối nếu có
       .trim();                       // Xóa khoảng trắng
     
-    const apiUrl = `https://${storeUrl}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
-    console.log('Final API URL:', apiUrl);
+    const cleanStoreUrl = storeUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+    const apiUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
     console.log('Testing connection to:', apiUrl);
 
     const response = await fetch(apiUrl, {
+      method: 'GET',
       headers: {
         'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
         'Content-Type': 'application/json'
