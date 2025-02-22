@@ -53,29 +53,28 @@ const testShopifyConnection = async () => {
     console.log('Testing Shopify connection...');
 
     const accessToken = import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim();
-    const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL?.trim();
+    let rawStoreUrl = import.meta.env.VITE_SHOPIFY_STORE_URL?.trim() || '';
 
     if (!accessToken) {
       throw new Error('Chưa cấu hình Access Token Shopify');
     }
 
-    if (!storeUrl) {
+    if (!rawStoreUrl) {
       throw new Error('Chưa cấu hình URL cửa hàng Shopify');
     }
 
-    // Validate store URL format
-    const urlPattern = /^[a-zA-Z0-9-]+\.myshopify\.com$/;
-    if (!urlPattern.test(storeUrl)) {
-      throw new Error('URL cửa hàng phải có định dạng xxx.myshopify.com (không cần https://)');
-    }
-    
-    // Đảm bảo URL đúng định dạng
-    storeUrl = storeUrl
+    // Clean up store URL
+    const cleanStoreUrl = rawStoreUrl
       .replace(/^https?:\/\//i, '')  // Xóa protocol nếu có
       .replace(/\/$/, '')            // Xóa dấu / cuối nếu có
       .trim();                       // Xóa khoảng trắng
+
+    // Validate store URL format
+    const urlPattern = /^[a-zA-Z0-9-]+\.myshopify\.com$/;
+    if (!urlPattern.test(cleanStoreUrl)) {
+      throw new Error('URL cửa hàng phải có định dạng xxx.myshopify.com (không cần https://)');
+    }
     
-    const cleanStoreUrl = storeUrl.replace(/^https?:\/\//i, '').replace(/\/$/, '');
     const apiUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
     console.log('Testing connection to:', apiUrl);
 
