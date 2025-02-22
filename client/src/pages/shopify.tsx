@@ -52,7 +52,7 @@ const testShopifyConnection = async () => {
   try {
     console.log('Testing Shopify connection...');
 
-    const apiUrl = `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
+    const apiUrl = `https://${import.meta.env.VITE_SHOPIFY_STORE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
     console.log('Testing connection to:', apiUrl);
 
     const response = await fetch(apiUrl, {
