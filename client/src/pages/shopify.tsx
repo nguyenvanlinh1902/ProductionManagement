@@ -38,7 +38,7 @@ const validateShopifyCredentials = () => {
 
 // Format store URL correctly
 const getShopifyApiUrl = (endpoint: string) => {
-  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL;
+  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
   return `https://${storeUrl}${endpoint}`;
 };
 
