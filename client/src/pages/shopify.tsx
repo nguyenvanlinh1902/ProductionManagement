@@ -222,25 +222,37 @@ export default function Shopify() {
               address: shopifyOrder.billing_address?.address1
             },
             products: shopifyOrder.line_items.map((item: any) => {
+              // Ensure properties is always an array
               const properties = Array.isArray(item.properties) ? item.properties : [];
-              const embroideryPositionsStr = properties.find((p: any) => p.name === "Embroidery Positions")?.value || '';
               
+              // Extract properties with better error handling
+              const colorProp = properties.find((p: any) => p.name === "Color");
+              const sizeProp = properties.find((p: any) => p.name === "Size");
+              const embroideryProp = properties.find((p: any) => p.name === "Embroidery Positions");
+
+              // Parse embroidery positions
+              const embroideryPositions = embroideryProp?.value 
+                ? embroideryProp.value.split(',')
+                    .map(pos => pos.trim())
+                    .filter(Boolean)
+                    .map(pos => ({
+                      name: pos,
+                      description: '',
+                      designFile: item.properties?.find((p: any) => p.name === `${pos}_design`)?.value || ''
+                    }))
+                : [];
+
               return {
-                name: item.title || '',
-                quantity: parseInt(item.quantity) || 1,
-                price: parseFloat(item.price) || 0,
-                sku: item.sku || '',
-                color: properties.find((p: any) => p.name === "Color")?.value || '',
-                size: properties.find((p: any) => p.name === "Size")?.value || '',
-                embroideryPositions: embroideryPositionsStr
-                  ? embroideryPositionsStr.split(',')
-                      .map(pos => pos.trim())
-                      .filter(pos => pos)
-                      .map(pos => ({
-                        name: pos,
-                        description: ''
-                      }))
-                  : []
+                name: item.title || 'Untitled Product',
+                quantity: Number(item.quantity) || 1,
+                price: Number(item.price) || 0,
+                sku: item.sku || `SKU-${Date.now()}`,
+                color: colorProp?.value || '',
+                size: sizeProp?.value || '',
+                embroideryPositions,
+                variant_id: item.variant_id,
+                product_id: item.product_id,
+                properties: properties
               };
             }),
             createdAt: new Date(shopifyOrder.created_at).toISOString(),
