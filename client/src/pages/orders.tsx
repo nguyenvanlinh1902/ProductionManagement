@@ -24,7 +24,11 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import type { ShopifyOrder } from "@/lib/types";
 
-export default function Orders() {
+function Orders() {
+  // Component code
+}
+
+export default Orders;
   const [_, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
@@ -93,17 +97,7 @@ export default function Orders() {
 
       <div className="border rounded-lg overflow-x-auto">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="whitespace-nowrap">Mã đơn</TableHead>
-              <TableHead className="whitespace-nowrap">Khách hàng</TableHead>
-              <TableHead className="whitespace-nowrap">Sản phẩm</TableHead>
-              <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
-              <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
-              <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
+          <TableHeader><TableRow><TableHead className="whitespace-nowrap">Mã đơn</TableHead><TableHead className="whitespace-nowrap">Khách hàng</TableHead><TableHead className="whitespace-nowrap">Sản phẩm</TableHead><TableHead className="whitespace-nowrap">Trạng thái</TableHead><TableHead className="whitespace-nowrap">Tiến độ</TableHead><TableHead className="whitespace-nowrap">Ngày tạo</TableHead><TableHead className="w-[100px]"></TableHead></TableRow></TableHeader>
           <TableBody>
             {orders.map((order) => (
               <TableRow key={order.id}>

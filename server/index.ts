@@ -63,9 +63,10 @@ app.use((req, res, next) => {
     log(`serving on port ${PORT}`);
   }).on('error', (e: any) => {
     if (e.code === 'EADDRINUSE') {
-      log(`Port ${PORT} is busy, trying ${PORT + 1}`);
-      server.listen(PORT + 1, "0.0.0.0", () => {
-        log(`serving on port ${PORT + 1}`);
+      const newPort = PORT + 1;
+      log(`Port ${PORT} is busy, using port ${newPort}`);
+      server.listen(newPort, "0.0.0.0", () => {
+        log(`serving on port ${newPort}`);
       });
     } else {
       throw e;
