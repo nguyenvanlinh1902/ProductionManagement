@@ -20,6 +20,36 @@ import type { ShopifyOrder } from "@/lib/types";
 
 const SHOPIFY_API_VERSION = '2024-01';
 
+// Add validation for Shopify credentials
+const validateShopifyCredentials = () => {
+  const required = ['VITE_SHOPIFY_STORE_URL', 'VITE_SHOPIFY_ACCESS_TOKEN'];
+  const missing = required.filter(key => !import.meta.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(`Thiếu thông tin cấu hình Shopify: ${missing.join(', ')}`);
+  }
+};
+
+// Test Shopify API connection
+const testShopifyConnection = async () => {
+  const response = await fetch(
+    `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
+    {
+      headers: {
+        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Không thể kết nối với Shopify: ${errorData.errors || response.statusText}`);
+  }
+
+  return true;
+};
+
 export default function Shopify() {
   const { toast } = useToast();
 
@@ -45,24 +75,50 @@ export default function Shopify() {
   const syncFromShopify = useMutation({
     mutationFn: async () => {
       try {
-        // Fetch orders from Shopify
-        const response = await fetch(
-          `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any`,
-          {
-            headers: {
-              'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
-            }
+        // Validate credentials
+        validateShopifyCredentials();
+
+        // Test connection first
+        console.log('Testing Shopify connection...');
+        await testShopifyConnection();
+        console.log('Shopify connection test successful');
+
+        // Fetch orders
+        const apiUrl = `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any`;
+        console.log('Fetching orders from Shopify:', apiUrl);
+
+        const response = await fetch(apiUrl, {
+          headers: {
+            'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
+            'Content-Type': 'application/json'
           }
-        );
+        });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(`Lỗi Shopify API: ${JSON.stringify(errorData.errors)}`);
+          console.error('Shopify API error:', {
+            status: response.status,
+            statusText: response.statusText,
+            errors: errorData
+          });
+          throw new Error(
+            `Lỗi API Shopify (${response.status}): ${
+              errorData.errors ? JSON.stringify(errorData.errors) : response.statusText
+            }`
+          );
         }
 
         const data = await response.json();
 
+        if (!data.orders) {
+          console.error('Invalid Shopify response:', data);
+          throw new Error('Dữ liệu trả về từ Shopify không hợp lệ');
+        }
+
+        console.log('Received orders from Shopify:', data.orders.length);
+
         // Save orders to Firebase
+        let importedCount = 0;
         for (const shopifyOrder of data.orders) {
           const orderData = {
             orderNumber: shopifyOrder.name,
@@ -98,25 +154,39 @@ export default function Shopify() {
 
           if (existingOrders.empty) {
             await addDoc(collection(db, "shopify_orders"), orderData);
+            importedCount++;
           }
         }
 
-        return true;
+        console.log(`Successfully imported ${importedCount} new orders`);
+        return importedCount;
       } catch (error: any) {
         console.error('Shopify sync error:', error);
-        throw new Error(error.message || 'Lỗi khi đồng bộ với Shopify');
+
+        // Handle network errors
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+          throw new Error('Không thể kết nối đến Shopify. Vui lòng kiểm tra kết nối mạng và URL cửa hàng.');
+        }
+
+        // Handle missing credentials
+        if (error.message.includes('Thiếu thông tin cấu hình')) {
+          throw new Error(error.message);
+        }
+
+        // Handle other errors
+        throw new Error(error.message || 'Lỗi không xác định khi đồng bộ với Shopify');
       }
     },
-    onSuccess: () => {
+    onSuccess: (importedCount) => {
       toast({
         title: "Thành công",
-        description: "Đã đồng bộ đơn hàng từ Shopify"
+        description: `Đã đồng bộ ${importedCount} đơn hàng mới từ Shopify`
       });
       refetch();
     },
     onError: (error: any) => {
       toast({
-        title: "Lỗi",
+        title: "Lỗi đồng bộ",
         description: error.message,
         variant: "destructive"
       });
@@ -127,6 +197,9 @@ export default function Shopify() {
   const importToShopify = useMutation({
     mutationFn: async (orders: ShopifyOrder[]) => {
       try {
+        // Test connection first
+        await testShopifyConnection();
+
         // Create orders one by one to handle potential errors
         for (const order of orders) {
           const orderData = {
@@ -151,6 +224,8 @@ export default function Shopify() {
             }
           };
 
+          console.log('Creating Shopify order:', orderData);
+
           const response = await fetch(
             `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json`,
             {
@@ -165,7 +240,8 @@ export default function Shopify() {
 
           if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(`Lỗi Shopify API: ${JSON.stringify(errorData.errors)}`);
+            console.error('Shopify order creation error:', errorData);
+            throw new Error(`Lỗi tạo đơn hàng trên Shopify: ${JSON.stringify(errorData.errors)}`);
           }
 
           // Update imported status in Firebase
@@ -277,7 +353,6 @@ export default function Shopify() {
     };
     reader.readAsText(file);
   };
-
 
   if (isLoading) {
     return <div>Đang tải...</div>;
