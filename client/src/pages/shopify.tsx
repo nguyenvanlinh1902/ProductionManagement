@@ -52,17 +52,28 @@ const testShopifyConnection = async () => {
   try {
     console.log('Testing Shopify connection...');
 
+    if (!import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN) {
+      throw new Error('Chưa cấu hình Access Token Shopify');
+    }
+
+    if (!import.meta.env.VITE_SHOPIFY_STORE_URL) {
+      throw new Error('Chưa cấu hình URL cửa hàng Shopify');
+    }
+
     const apiUrl = `https://${import.meta.env.VITE_SHOPIFY_STORE_URL.replace(/^https?:\/\//, '').replace(/\/$/, '')}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
     console.log('Testing connection to:', apiUrl);
 
     const response = await fetch(apiUrl, {
       headers: {
-        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN || '',
+        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
         'Content-Type': 'application/json'
       }
     }).catch(err => {
       console.error('Fetch error:', err);
-      throw new Error('Không thể kết nối tới Shopify API. Vui lòng kiểm tra kết nối mạng và cấu hình.');
+      if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+        throw new Error('Không thể kết nối tới Shopify. Vui lòng kiểm tra URL cửa hàng và kết nối mạng.');
+      }
+      throw new Error(`Lỗi kết nối: ${err.message}`);
     });
 
     if (!response.ok) {
@@ -84,6 +95,7 @@ const testShopifyConnection = async () => {
 
 export default function Shopify() {
   const { toast } = useToast();
+  const [error, setError] = useState<string | null>(null);
 
   // Lấy danh sách đơn hàng chưa import
   const { data: pendingOrders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
@@ -378,6 +390,19 @@ export default function Shopify() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Lỗi! </strong>
+          <span className="block sm:inline">{error}</span>
+          <button
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setError(null)}
+          >
+            <span className="sr-only">Đóng</span>
+            <span className="text-2xl">&times;</span>
+          </button>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold">Đồng bộ Shopify</h1>
 
