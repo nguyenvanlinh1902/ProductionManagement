@@ -28,26 +28,50 @@ const validateShopifyCredentials = () => {
   if (missing.length > 0) {
     throw new Error(`Thiếu thông tin cấu hình Shopify: ${missing.join(', ')}`);
   }
+
+  // Validate store URL format
+  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL;
+  if (!storeUrl.includes('.myshopify.com')) {
+    throw new Error('URL cửa hàng Shopify không hợp lệ. URL phải có định dạng xxx.myshopify.com');
+  }
+};
+
+// Format store URL correctly
+const getShopifyApiUrl = (endpoint: string) => {
+  const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL;
+  return `https://${storeUrl}${endpoint}`;
 };
 
 // Test Shopify API connection
 const testShopifyConnection = async () => {
-  const response = await fetch(
-    `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/shop.json`,
-    {
+  try {
+    console.log('Testing Shopify connection...');
+
+    const apiUrl = getShopifyApiUrl(`/admin/api/${SHOPIFY_API_VERSION}/shop.json`);
+    console.log('Testing connection to:', apiUrl);
+
+    const response = await fetch(apiUrl, {
       headers: {
         'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
         'Content-Type': 'application/json'
       }
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Không thể kết nối với Shopify: ${errorData.errors || response.statusText}`);
     }
-  );
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Không thể kết nối với Shopify: ${errorData.errors || response.statusText}`);
+    const data = await response.json();
+    console.log('Connection test successful:', data.shop?.name);
+    return true;
+  } catch (error: any) {
+    console.error('Connection test failed:', error);
+    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      throw new Error('Không thể kết nối tới Shopify. Vui lòng kiểm tra URL cửa hàng và kết nối mạng.');
+    }
+    throw error;
   }
-
-  return true;
 };
 
 export default function Shopify() {
@@ -79,13 +103,11 @@ export default function Shopify() {
         validateShopifyCredentials();
 
         // Test connection first
-        console.log('Testing Shopify connection...');
         await testShopifyConnection();
-        console.log('Shopify connection test successful');
 
         // Fetch orders
-        const apiUrl = `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any`;
-        console.log('Fetching orders from Shopify:', apiUrl);
+        const apiUrl = getShopifyApiUrl(`/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any`);
+        console.log('Fetching orders from:', apiUrl);
 
         const response = await fetch(apiUrl, {
           headers: {
@@ -162,19 +184,7 @@ export default function Shopify() {
         return importedCount;
       } catch (error: any) {
         console.error('Shopify sync error:', error);
-
-        // Handle network errors
-        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-          throw new Error('Không thể kết nối đến Shopify. Vui lòng kiểm tra kết nối mạng và URL cửa hàng.');
-        }
-
-        // Handle missing credentials
-        if (error.message.includes('Thiếu thông tin cấu hình')) {
-          throw new Error(error.message);
-        }
-
-        // Handle other errors
-        throw new Error(error.message || 'Lỗi không xác định khi đồng bộ với Shopify');
+        throw error;
       }
     },
     onSuccess: (importedCount) => {
@@ -227,7 +237,7 @@ export default function Shopify() {
           console.log('Creating Shopify order:', orderData);
 
           const response = await fetch(
-            `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json`,
+            getShopifyApiUrl(`/admin/api/${SHOPIFY_API_VERSION}/orders.json`),
             {
               method: 'POST',
               headers: {
