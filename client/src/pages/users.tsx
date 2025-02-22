@@ -211,7 +211,7 @@ export default function Users() {
                 <TableHead>Tên</TableHead>
                 <TableHead>Vai trò</TableHead>
                 <TableHead>Công đoạn</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
+                <TableHead>Trạng thái</TableHead> {/* Added this line */}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -264,11 +264,11 @@ export default function Users() {
                       </Popover>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell> {/* Added this line */}
                     <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                       Hoạt động
                     </span>
-                  </TableCell>
+                  </TableCell> {/* Added this line */}
                 </TableRow>
               ))}
             </TableBody>

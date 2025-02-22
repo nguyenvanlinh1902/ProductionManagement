@@ -143,9 +143,67 @@ export default function Orders() {
     onSuccess: () => {
       toast({
         title: "Thành công",
-        description: "Đã import đơn hàng từ Shopify"
+        description: "Đã import đơn hàng"
       });
       refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Lỗi",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  // Import đơn hàng lên Shopify
+  const exportToShopify = useMutation({
+    mutationFn: async (orders: ShopifyOrder[]) => {
+      const shopifyOrdersData = orders.map(order => ({
+        email: order.customer.email,
+        phone: order.customer.phone,
+        billing_address: {
+          first_name: order.customer.name,
+          address1: order.customer.address,
+        },
+        line_items: order.products.map(product => ({
+          title: product.name,
+          quantity: product.quantity,
+          price: product.price,
+          sku: product.sku,
+          properties: {
+            Color: product.color,
+            Size: product.size,
+            'Embroidery Positions': product.embroideryPositions?.map(p => p.name).join(', ')
+          }
+        }))
+      }));
+
+      // Gửi dữ liệu lên Shopify API
+      try {
+        const response = await fetch(`https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
+          },
+          body: JSON.stringify({ orders: shopifyOrdersData })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to export orders to Shopify');
+        }
+
+        return await response.json();
+      } catch (error: any) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Thành công",
+        description: "Đã xuất đơn hàng lên Shopify"
+      });
     },
     onError: (error: any) => {
       toast({
@@ -160,6 +218,18 @@ export default function Orders() {
     const file = event.target.files?.[0];
     if (file) {
       importOrders.mutate(file);
+    }
+  };
+
+  const handleExportToShopify = () => {
+    if (orders.length > 0) {
+      exportToShopify.mutate(orders);
+    } else {
+      toast({
+        title: "Lỗi",
+        description: "Không có đơn hàng để xuất",
+        variant: "destructive"
+      });
     }
   };
 
@@ -214,6 +284,14 @@ export default function Orders() {
               </span>
             </Button>
           </label>
+          <Button 
+            onClick={handleExportToShopify}
+            className="w-full sm:w-auto"
+            disabled={orders.length === 0 || exportToShopify.isPending}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            Xuất lên Shopify
+          </Button>
         </div>
       </div>
 
@@ -286,7 +364,7 @@ export default function Orders() {
                 </TableCell>
                 <TableCell>
                   <div className="min-w-[150px] space-y-1">
-                    {order.stages.map(stage => (
+                    {order?.stages?.map(stage => (
                       <div key={stage.id} className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${
                           stage.status === 'completed' ? 'bg-green-500' :
