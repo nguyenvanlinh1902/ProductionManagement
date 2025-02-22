@@ -80,6 +80,12 @@ const testShopifyConnection = async () => {
 
     try {
       console.log('Making request to:', apiUrl);
+      const accessToken = import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim();
+      
+      if (!accessToken) {
+        throw new Error('Access Token không được định nghĩa');
+      }
+
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
@@ -87,10 +93,10 @@ const testShopifyConnection = async () => {
           'Content-Type': 'application/json',
         },
         mode: 'cors',
-        cache: 'no-cache'
       });
 
       console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -215,18 +221,28 @@ export default function Shopify() {
               phone: shopifyOrder.phone,
               address: shopifyOrder.billing_address?.address1
             },
-            products: shopifyOrder.line_items.map((item: any) => ({
-              name: item.title,
-              quantity: item.quantity,
-              price: parseFloat(item.price),
-              sku: item.sku,
-              color: item.properties?.find((p: any) => p.name === "Color")?.value || '',
-              size: item.properties?.find((p: any) => p.name === "Size")?.value || '',
-              embroideryPositions: item.properties?.find((p: any) => p.name === "Embroidery Positions")?.value?.split(',').map((pos: string) => ({
-                name: pos.trim(),
-                description: ''
-              })) || []
-            })),
+            products: shopifyOrder.line_items.map((item: any) => {
+              const properties = Array.isArray(item.properties) ? item.properties : [];
+              const embroideryPositionsStr = properties.find((p: any) => p.name === "Embroidery Positions")?.value || '';
+              
+              return {
+                name: item.title || '',
+                quantity: parseInt(item.quantity) || 1,
+                price: parseFloat(item.price) || 0,
+                sku: item.sku || '',
+                color: properties.find((p: any) => p.name === "Color")?.value || '',
+                size: properties.find((p: any) => p.name === "Size")?.value || '',
+                embroideryPositions: embroideryPositionsStr
+                  ? embroideryPositionsStr.split(',')
+                      .map(pos => pos.trim())
+                      .filter(pos => pos)
+                      .map(pos => ({
+                        name: pos,
+                        description: ''
+                      }))
+                  : []
+              };
+            }),
             createdAt: new Date(shopifyOrder.created_at).toISOString(),
             total: parseFloat(shopifyOrder.total_price)
           };
