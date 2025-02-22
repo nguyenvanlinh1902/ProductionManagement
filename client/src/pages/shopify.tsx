@@ -18,7 +18,7 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, orderBy, updateDoc, doc } from "firebase/firestore";
 import type { ShopifyOrder } from "@/lib/types";
 
-const SHOPIFY_API_VERSION = '2024-01';
+const SHOPIFY_API_VERSION = '2024-04';
 
 // Add validation for Shopify credentials
 const validateShopifyCredentials = () => {
