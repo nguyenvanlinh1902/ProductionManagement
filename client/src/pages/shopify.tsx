@@ -11,12 +11,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Upload, Download, RefreshCw } from "lucide-react";
+import { Upload, RefreshCw } from "lucide-react";
 import Papa from 'papaparse';
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, where, orderBy } from "firebase/firestore";
-import type { ShopifyOrder, EmbroideryPosition, Product } from "@/lib/types";
+import { collection, addDoc, getDocs, query, where, orderBy, updateDoc, doc } from "firebase/firestore";
+import type { ShopifyOrder } from "@/lib/types";
 
 export default function Shopify() {
   const { toast } = useToast();
@@ -50,16 +50,13 @@ export default function Shopify() {
               for (const row of results.data as any[]) {
                 if (!row.Name || !row.Email) continue;
 
-                const embroideryPositions: EmbroideryPosition[] = [];
-                if (row.Notes) {
-                  const positions = row.Notes.split(',').map((pos: string) => ({
+                const embroideryPositions = row.Notes ? 
+                  row.Notes.split(',').map((pos: string) => ({
                     name: pos.trim(),
                     description: '',
-                  }));
-                  embroideryPositions.push(...positions);
-                }
+                  })) : [];
 
-                const product: Product = {
+                const product = {
                   name: row['Lineitem name'] || '',
                   quantity: parseInt(row['Lineitem quantity']) || 1,
                   price: parseFloat(row['Lineitem price']) || 0,
@@ -147,7 +144,8 @@ export default function Shopify() {
 
         // Cập nhật trạng thái đã đồng bộ
         for (const order of orders) {
-          await db.collection("shopify_orders").doc(order.id).update({
+          const orderRef = doc(db, "shopify_orders", order.id);
+          await updateDoc(orderRef, {
             synced: true,
             syncedAt: new Date().toISOString()
           });
