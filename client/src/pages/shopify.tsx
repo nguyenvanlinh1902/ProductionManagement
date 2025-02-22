@@ -78,19 +78,44 @@ const testShopifyConnection = async () => {
     const apiUrl = `https://${cleanStoreUrl}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
     console.log('Testing connection to:', apiUrl);
 
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN,
-        'Content-Type': 'application/json'
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'X-Shopify-Access-Token': accessToken,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        credentials: 'omit',
+        mode: 'cors',
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ errors: response.statusText }));
+        throw new Error(`Lỗi API Shopify (${response.status}): ${JSON.stringify(errorData.errors || 'Không xác định')}`);
       }
-    }).catch(err => {
+
+      const data = await response.json();
+      if (!data.shop) {
+        throw new Error('Phản hồi từ Shopify không hợp lệ');
+      }
+
+      return data;
+    } catch (err: any) {
       console.error('Fetch error:', err);
-      if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
-        throw new Error('Không thể kết nối tới Shopify. Vui lòng kiểm tra URL cửa hàng và kết nối mạng.');
+      if (err.name === 'AbortError') {
+        throw new Error('Kết nối tới Shopify quá thời gian, vui lòng thử lại');
       }
-      throw new Error(`Lỗi kết nối: ${err.message}`);
-    });
+      if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+        throw new Error('Không thể kết nối tới Shopify. Vui lòng kiểm tra:\n1. URL cửa hàng chính xác\n2. Access Token hợp lệ\n3. Kết nối mạng ổn định');
+      }
+      throw err;
+    }
 
     if (!response.ok) {
       const errorData = await response.json();
