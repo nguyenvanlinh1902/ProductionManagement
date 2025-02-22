@@ -24,11 +24,7 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import type { ShopifyOrder } from "@/lib/types";
 
-function Orders() {
-  // Component code
-}
-
-export default Orders;
+export default function Orders() {
   const [_, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
