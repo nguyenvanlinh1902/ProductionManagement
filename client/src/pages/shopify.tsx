@@ -151,17 +151,45 @@ export default function Shopify() {
   const { data: pendingOrders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders/pending-import'],
     queryFn: async () => {
-      const ordersRef = collection(db, "shopify_orders");
-      const q = query(
-        ordersRef,
-        where("imported", "==", false),
-        orderBy("createdAt", "desc")
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ShopifyOrder[];
+      try {
+        const ordersRef = collection(db, "shopify_orders");
+        const q = query(
+          ordersRef,
+          where("imported", "==", false),
+          orderBy("createdAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            orderNumber: data.orderNumber,
+            customer: data.customer,
+            products: Array.isArray(data.products) ? data.products.map(product => ({
+              name: product.name || '',
+              quantity: Number(product.quantity) || 0,
+              price: Number(product.price) || 0,
+              sku: product.sku || '',
+              color: product.color || '',
+              size: product.size || '',
+              embroideryPositions: Array.isArray(product.embroideryPositions) 
+                ? product.embroideryPositions.map(pos => ({
+                    name: pos.name || '',
+                    description: pos.description || ''
+                  }))
+                : []
+            })) : [],
+            status: data.status,
+            createdAt: data.createdAt,
+            total: Number(data.total) || 0,
+            imported: data.imported || false
+          };
+        });
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        throw error;
+      }
     }
   });
 
