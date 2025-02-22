@@ -60,12 +60,20 @@ const testShopifyConnection = async () => {
       throw new Error('Chưa cấu hình URL cửa hàng Shopify');
     }
 
-    // Remove any protocol and trailing slash from store URL
-    const storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL
-      .replace(/^https?:\/\//, '')  // Remove protocol if exists
-      .replace(/\/$/, '');          // Remove trailing slash if exists
+    // Validate and format store URL
+    let storeUrl = import.meta.env.VITE_SHOPIFY_STORE_URL;
+    if (!storeUrl.includes('.myshopify.com')) {
+      throw new Error('URL cửa hàng phải có định dạng xxx.myshopify.com');
+    }
+    
+    // Đảm bảo URL đúng định dạng
+    storeUrl = storeUrl
+      .replace(/^https?:\/\//i, '')  // Xóa protocol nếu có
+      .replace(/\/$/, '')            // Xóa dấu / cuối nếu có
+      .trim();                       // Xóa khoảng trắng
     
     const apiUrl = `https://${storeUrl}/admin/api/${SHOPIFY_API_VERSION}/shop.json`;
+    console.log('Final API URL:', apiUrl);
     console.log('Testing connection to:', apiUrl);
 
     const response = await fetch(apiUrl, {
