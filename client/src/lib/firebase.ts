@@ -2,6 +2,20 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
 
+// Kiểm tra biến môi trường Firebase
+const requiredEnvVars = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID'
+];
+
+for (const envVar of requiredEnvVars) {
+  if (!import.meta.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
@@ -11,20 +25,47 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Khởi tạo Firebase
-const app = initializeApp(firebaseConfig);
+// Khởi tạo Firebase với xử lý lỗi
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('Firebase initialized successfully');
+} catch (error: any) {
+  console.error('Error initializing Firebase:', error.message);
+  throw error;
+}
 
-// Khởi tạo các services
+// Khởi tạo các services với xử lý lỗi
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Authentication functions
+// Hàm test kết nối Firestore
+export const testFirestoreConnection = async () => {
+  try {
+    const testDoc = doc(db, "_test_connection", "test");
+    await setDoc(testDoc, {
+      timestamp: new Date().toISOString()
+    });
+    await getDoc(testDoc);
+    console.log('Firestore connection test successful');
+    return true;
+  } catch (error: any) {
+    console.error('Firestore connection test failed:', error.message);
+    throw error;
+  }
+};
+
+// Authentication functions with improved error handling
 export const login = async (email: string, password: string) => {
   try {
     return await signInWithEmailAndPassword(auth, email, password);
   } catch (error: any) {
+    console.error('Login error:', error);
     if (error.code === 'auth/network-request-failed') {
       throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+    }
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error('Email hoặc mật khẩu không đúng.');
     }
     throw error;
   }
@@ -44,9 +85,12 @@ export const register = async (email: string, password: string, role: string, na
 
     return userCredential;
   } catch (error: any) {
-    console.error('Error in register:', error);
+    console.error('Registration error:', error);
     if (error.code === 'auth/network-request-failed') {
       throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+    }
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error('Email này đã được sử dụng.');
     }
     throw error;
   }
@@ -105,7 +149,7 @@ export const logout = async () => {
   try {
     return await signOut(auth);
   } catch (error: any) {
-    console.error('Error in logout:', error);
+    console.error('Logout error:', error);
     if (error.code === 'auth/network-request-failed') {
       throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
     }
@@ -113,7 +157,7 @@ export const logout = async () => {
   }
 };
 
-// Firestore functions
+// Firestore functions with improved error handling
 export const getUserRole = async (uid: string) => {
   try {
     const userDoc = await getDoc(doc(db, "users", uid));

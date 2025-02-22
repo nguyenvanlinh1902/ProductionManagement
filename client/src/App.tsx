@@ -2,9 +2,10 @@ import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { auth, getUserRole, createAdminAccount } from "@/lib/firebase";
+import { auth, getUserRole, createAdminAccount, testFirestoreConnection } from "@/lib/firebase";
 import { useEffect, useState, Suspense } from "react";
 import { NavigationProvider } from "@/contexts/NavigationContext";
+import { useToast } from "@/hooks/use-toast";
 
 // Pages
 import Login from "@/pages/login";
@@ -16,7 +17,7 @@ import NotFound from "@/pages/not-found";
 import Settings from "@/pages/settings";
 import Users from "@/pages/users";
 import Scan from "@/pages/scan";
-import Shopify from "@/pages/shopify"; // Thêm import cho trang Shopify
+import Shopify from "@/pages/shopify";
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -33,13 +34,23 @@ function LoadingSpinner() {
 function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Test Firebase connection
+        await testFirestoreConnection();
+
+        // Create admin account if needed
         await createAdminAccount();
-      } catch (error) {
-        console.error("Error creating admin account:", error);
+      } catch (error: any) {
+        console.error("Firebase initialization error:", error);
+        toast({
+          title: "Lỗi kết nối",
+          description: "Không thể kết nối với hệ thống. Vui lòng thử lại sau.",
+          variant: "destructive"
+        });
       }
     };
     initializeApp();

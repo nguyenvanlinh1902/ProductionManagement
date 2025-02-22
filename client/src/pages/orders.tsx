@@ -18,17 +18,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Download, Eye, RefreshCw } from "lucide-react";
+import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import type {
-  ShopifyOrder,
-  EmbroideryPosition,
-  Product,
-  ProductionStage
-} from "@/lib/types";
-import { useLocation } from "wouter";
+import type { ShopifyOrder } from "@/lib/types";
 
 export default function Orders() {
   const [_, navigate] = useLocation();
@@ -49,24 +44,6 @@ export default function Orders() {
       })) as ShopifyOrder[];
     }
   });
-
-  // Xác định độ phức tạp của đơn hàng
-  const determineOrderComplexity = (products: Product[]) => {
-    let hasMultipleProducts = products.length > 1;
-    let hasMultiplePositions = products.some(p =>
-      p.embroideryPositions && p.embroideryPositions.length > 1
-    );
-
-    if (hasMultipleProducts && hasMultiplePositions) {
-      return 'very_complex';
-    } else if (hasMultiplePositions) {
-      return 'complex';
-    } else if (hasMultipleProducts) {
-      return 'medium';
-    }
-    return 'simple';
-  };
-
 
   const handleOrderSelect = async (order: ShopifyOrder) => {
     if (!order.qrCode) {
@@ -92,6 +69,7 @@ export default function Orders() {
       }
     }
     setSelectedOrder(order);
+    setIsOpen(true);
   };
 
   if (isLoading) {
@@ -122,7 +100,6 @@ export default function Orders() {
               <TableHead className="whitespace-nowrap">Mã đơn</TableHead>
               <TableHead className="whitespace-nowrap">Khách hàng</TableHead>
               <TableHead className="whitespace-nowrap">Sản phẩm</TableHead>
-              <TableHead className="whitespace-nowrap">Độ phức tạp</TableHead>
               <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
               <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
               <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
@@ -160,19 +137,6 @@ export default function Orders() {
                 </TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded-full text-xs ${
-                    order.complexity === 'very_complex' ? 'bg-red-100 text-red-800' :
-                    order.complexity === 'complex' ? 'bg-orange-100 text-orange-800' :
-                    order.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {order.complexity === 'very_complex' ? 'Rất phức tạp' :
-                     order.complexity === 'complex' ? 'Phức tạp' :
-                     order.complexity === 'medium' ? 'Trung bình' :
-                     'Đơn giản'}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-xs whitespace-nowrap ${
                     order.status === 'completed' ? 'bg-green-100 text-green-800' :
                     order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
                     'bg-yellow-100 text-yellow-800'
@@ -233,7 +197,7 @@ export default function Orders() {
         </Table>
       </div>
 
-      <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Chi tiết đơn hàng #{selectedOrder?.orderNumber}</DialogTitle>
@@ -278,20 +242,7 @@ export default function Orders() {
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="font-semibold mb-2">
-                    Mã QR
-                    <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                      selectedOrder.complexity === 'very_complex' ? 'bg-red-100 text-red-800' :
-                      selectedOrder.complexity === 'complex' ? 'bg-orange-100 text-orange-800' :
-                      selectedOrder.complexity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
-                      {selectedOrder.complexity === 'very_complex' ? 'Rất phức tạp' :
-                       selectedOrder.complexity === 'complex' ? 'Phức tạp' :
-                       selectedOrder.complexity === 'medium' ? 'Trung bình' :
-                       'Đơn giản'}
-                    </span>
-                  </h3>
+                  <h3 className="font-semibold mb-2">Mã QR</h3>
                   {selectedOrder.qrCode && (
                     <div className="bg-white p-4 rounded-lg">
                       <img

@@ -18,6 +18,8 @@ import { db } from "@/lib/firebase";
 import { collection, addDoc, getDocs, query, where, orderBy, updateDoc, doc } from "firebase/firestore";
 import type { ShopifyOrder } from "@/lib/types";
 
+const SHOPIFY_API_VERSION = '2024-01';
+
 export default function Shopify() {
   const { toast } = useToast();
 
@@ -108,41 +110,53 @@ export default function Shopify() {
   // Đồng bộ đơn hàng lên Shopify
   const syncToShopify = useMutation({
     mutationFn: async (orders: ShopifyOrder[]) => {
-      const shopifyOrdersData = orders.map(order => ({
-        email: order.customer.email,
-        phone: order.customer.phone,
-        billing_address: {
-          first_name: order.customer.name,
-          address1: order.customer.address,
-        },
-        line_items: order.products.map(product => ({
-          title: product.name,
-          quantity: product.quantity,
-          price: product.price,
-          sku: product.sku,
-          properties: {
-            Color: product.color,
-            Size: product.size,
-            'Embroidery Positions': product.embroideryPositions?.map(p => p.name).join(', ')
-          }
-        }))
+      const shopifyOrders = orders.map(order => ({
+        order: {
+          email: order.customer.email,
+          phone: order.customer.phone,
+          billing_address: {
+            first_name: order.customer.name,
+            address1: order.customer.address,
+          },
+          line_items: order.products.map(product => ({
+            title: product.name,
+            quantity: product.quantity,
+            price: product.price.toString(),
+            sku: product.sku,
+            properties: [
+              { name: "Color", value: product.color },
+              { name: "Size", value: product.size },
+              { name: "Embroidery Positions", value: product.embroideryPositions?.map(p => p.name).join(', ') }
+            ]
+          }))
+        }
       }));
 
       try {
-        const response = await fetch(`https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
-          },
-          body: JSON.stringify({ orders: shopifyOrdersData })
-        });
+        // Create orders one by one to handle potential errors
+        for (const orderData of shopifyOrders) {
+          const response = await fetch(
+            `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
+              },
+              body: JSON.stringify(orderData)
+            }
+          );
 
-        if (!response.ok) {
-          throw new Error('Lỗi khi đồng bộ với Shopify');
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Lỗi Shopify API: ${JSON.stringify(errorData.errors)}`);
+          }
+
+          const data = await response.json();
+          console.log('Shopify order created:', data);
         }
 
-        // Cập nhật trạng thái đã đồng bộ
+        // Update synced status in Firebase
         for (const order of orders) {
           const orderRef = doc(db, "shopify_orders", order.id);
           await updateDoc(orderRef, {
@@ -151,9 +165,10 @@ export default function Shopify() {
           });
         }
 
-        return await response.json();
+        return true;
       } catch (error: any) {
-        throw new Error(error.message);
+        console.error('Shopify sync error:', error);
+        throw new Error(error.message || 'Lỗi khi đồng bộ với Shopify');
       }
     },
     onSuccess: () => {
