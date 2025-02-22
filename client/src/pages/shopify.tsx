@@ -79,25 +79,28 @@ const testShopifyConnection = async () => {
     console.log('Testing connection to:', apiUrl);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
+      console.log('Making request to:', apiUrl);
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'X-Shopify-Access-Token': accessToken,
           'Content-Type': 'application/json',
         },
-        signal: controller.signal,
-        credentials: 'omit',
         mode: 'cors',
+        cache: 'no-cache'
       });
 
-      clearTimeout(timeoutId);
+      console.log('Response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ errors: response.statusText }));
-        throw new Error(`Lỗi API Shopify (${response.status}): ${JSON.stringify(errorData.errors || 'Không xác định')}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(`Lỗi API Shopify (${response.status}): ${JSON.stringify(errorData.errors || errorData)}`);
+        } catch (e) {
+          throw new Error(`Lỗi kết nối Shopify (${response.status}): ${errorText || response.statusText}`);
+        }
       }
 
       const data = await response.json();
