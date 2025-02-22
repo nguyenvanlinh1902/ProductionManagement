@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -32,7 +31,7 @@ export default function Orders() {
   const { toast } = useToast();
 
   // Lấy danh sách đơn hàng
-  const { data: orders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
+  const { data: orders = [], isLoading } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders'],
     queryFn: async () => {
       const ordersRef = collection(db, "shopify_orders");
@@ -58,8 +57,7 @@ export default function Orders() {
             color: p.color,
             size: p.size,
             embroideryPositions: p.embroideryPositions || []
-          })),
-          complexity: order.complexity
+          }))
         };
 
         const qrCodeDataUrl = await QRCode.toDataURL(JSON.stringify(qrData));
@@ -103,7 +101,6 @@ export default function Orders() {
               <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
               <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
               <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
-              <TableHead className="whitespace-nowrap">Hạn giao</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -162,9 +159,6 @@ export default function Orders() {
                 </TableCell>
                 <TableCell className="whitespace-nowrap">
                   {new Date(order.createdAt).toLocaleDateString('vi-VN')}
-                </TableCell>
-                <TableCell className="whitespace-nowrap">
-                  {order.deadline ? new Date(order.deadline).toLocaleDateString('vi-VN') : '-'}
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
@@ -240,58 +234,28 @@ export default function Orders() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-2">Mã QR</h3>
-                  {selectedOrder.qrCode && (
-                    <div className="bg-white p-4 rounded-lg">
-                      <img
-                        src={selectedOrder.qrCode}
-                        alt="QR Code"
-                        className="w-40 h-40 mx-auto"
-                      />
-                      <Button
-                        onClick={() => {
-                          const link = document.createElement('a');
-                          link.href = selectedOrder.qrCode!;
-                          link.download = `order-${selectedOrder.orderNumber}-qr.png`;
-                          link.click();
-                        }}
-                        variant="outline"
-                        className="w-full mt-4"
-                      >
-                        <Download className="mr-2 h-4 w-4" />
-                        Tải mã QR
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <h3 className="font-semibold mb-2">Tiến độ sản xuất</h3>
-                  <div className="space-y-2">
-                    {selectedOrder.stages.map(stage => (
-                      <div key={stage.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            stage.status === 'completed' ? 'bg-green-500' :
-                            stage.status === 'in_progress' ? 'bg-blue-500' :
-                            'bg-gray-300'
-                          }`} />
-                          <span>{stage.name}</span>
-                        </div>
-                        <span className="text-sm text-muted-foreground">
-                          {stage.completedAt ? new Date(stage.completedAt).toLocaleDateString('vi-VN') : '-'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedOrder.notes && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Ghi chú</h3>
-                    <p className="text-sm">{selectedOrder.notes}</p>
+              <div>
+                <h3 className="font-semibold mb-2">Mã QR</h3>
+                {selectedOrder.qrCode && (
+                  <div className="bg-white p-4 rounded-lg">
+                    <img
+                      src={selectedOrder.qrCode}
+                      alt="QR Code"
+                      className="w-40 h-40 mx-auto"
+                    />
+                    <Button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = selectedOrder.qrCode!;
+                        link.download = `order-${selectedOrder.orderNumber}-qr.png`;
+                        link.click();
+                      }}
+                      variant="outline"
+                      className="w-full mt-4"
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Tải mã QR
+                    </Button>
                   </div>
                 )}
               </div>

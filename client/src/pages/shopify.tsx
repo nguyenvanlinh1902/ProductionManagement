@@ -23,14 +23,14 @@ const SHOPIFY_API_VERSION = '2024-01';
 export default function Shopify() {
   const { toast } = useToast();
 
-  // Lấy danh sách đơn hàng chưa đồng bộ
+  // Lấy danh sách đơn hàng chưa import
   const { data: pendingOrders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
-    queryKey: ['/api/orders/pending-sync'],
+    queryKey: ['/api/orders/pending-import'],
     queryFn: async () => {
       const ordersRef = collection(db, "shopify_orders");
       const q = query(
         ordersRef,
-        where("synced", "==", false),
+        where("imported", "==", false),
         orderBy("createdAt", "desc")
       );
       const snapshot = await getDocs(q);
@@ -41,60 +41,76 @@ export default function Shopify() {
     }
   });
 
-  // Import đơn hàng từ CSV
-  const importOrders = useMutation({
-    mutationFn: async (file: File) => {
-      return new Promise((resolve, reject) => {
-        Papa.parse(file, {
-          header: true,
-          complete: async (results) => {
-            try {
-              for (const row of results.data as any[]) {
-                if (!row.Name || !row.Email) continue;
-
-                const embroideryPositions = row.Notes ? 
-                  row.Notes.split(',').map((pos: string) => ({
-                    name: pos.trim(),
-                    description: '',
-                  })) : [];
-
-                const product = {
-                  name: row['Lineitem name'] || '',
-                  quantity: parseInt(row['Lineitem quantity']) || 1,
-                  price: parseFloat(row['Lineitem price']) || 0,
-                  sku: row['Lineitem sku'] || '',
-                  color: row['Lineitem properties Color'] || '',
-                  size: row['Lineitem properties Size'] || '',
-                  embroideryPositions
-                };
-
-                await addDoc(collection(db, "shopify_orders"), {
-                  orderNumber: row.Name,
-                  synced: false,
-                  customer: {
-                    name: row['Billing Name'] || '',
-                    email: row.Email || '',
-                    phone: row.Phone || '',
-                    address: row['Billing Address1'] || ''
-                  },
-                  products: [product],
-                  createdAt: new Date().toISOString(),
-                  total: parseFloat(row.Total) || 0,
-                });
-              }
-              resolve(true);
-            } catch (error) {
-              reject(error);
+  // Đồng bộ đơn hàng từ Shopify
+  const syncFromShopify = useMutation({
+    mutationFn: async () => {
+      try {
+        // Fetch orders from Shopify
+        const response = await fetch(
+          `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json?status=any`,
+          {
+            headers: {
+              'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
             }
-          },
-          error: (error) => reject(error)
-        });
-      });
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Lỗi Shopify API: ${JSON.stringify(errorData.errors)}`);
+        }
+
+        const data = await response.json();
+
+        // Save orders to Firebase
+        for (const shopifyOrder of data.orders) {
+          const orderData = {
+            orderNumber: shopifyOrder.name,
+            imported: false,
+            customer: {
+              name: shopifyOrder.customer?.first_name + ' ' + shopifyOrder.customer?.last_name,
+              email: shopifyOrder.email,
+              phone: shopifyOrder.phone,
+              address: shopifyOrder.billing_address?.address1
+            },
+            products: shopifyOrder.line_items.map((item: any) => ({
+              name: item.title,
+              quantity: item.quantity,
+              price: parseFloat(item.price),
+              sku: item.sku,
+              color: item.properties?.find((p: any) => p.name === "Color")?.value || '',
+              size: item.properties?.find((p: any) => p.name === "Size")?.value || '',
+              embroideryPositions: item.properties?.find((p: any) => p.name === "Embroidery Positions")?.value?.split(',').map((pos: string) => ({
+                name: pos.trim(),
+                description: ''
+              })) || []
+            })),
+            createdAt: new Date(shopifyOrder.created_at).toISOString(),
+            total: parseFloat(shopifyOrder.total_price)
+          };
+
+          // Check if order already exists
+          const existingOrdersQuery = query(
+            collection(db, "shopify_orders"),
+            where("orderNumber", "==", orderData.orderNumber)
+          );
+          const existingOrders = await getDocs(existingOrdersQuery);
+
+          if (existingOrders.empty) {
+            await addDoc(collection(db, "shopify_orders"), orderData);
+          }
+        }
+
+        return true;
+      } catch (error: any) {
+        console.error('Shopify sync error:', error);
+        throw new Error(error.message || 'Lỗi khi đồng bộ với Shopify');
+      }
     },
     onSuccess: () => {
       toast({
         title: "Thành công",
-        description: "Đã import đơn hàng"
+        description: "Đã đồng bộ đơn hàng từ Shopify"
       });
       refetch();
     },
@@ -107,34 +123,34 @@ export default function Shopify() {
     }
   });
 
-  // Đồng bộ đơn hàng lên Shopify
-  const syncToShopify = useMutation({
+  // Import đơn hàng lên Shopify
+  const importToShopify = useMutation({
     mutationFn: async (orders: ShopifyOrder[]) => {
-      const shopifyOrders = orders.map(order => ({
-        order: {
-          email: order.customer.email,
-          phone: order.customer.phone,
-          billing_address: {
-            first_name: order.customer.name,
-            address1: order.customer.address,
-          },
-          line_items: order.products.map(product => ({
-            title: product.name,
-            quantity: product.quantity,
-            price: product.price.toString(),
-            sku: product.sku,
-            properties: [
-              { name: "Color", value: product.color },
-              { name: "Size", value: product.size },
-              { name: "Embroidery Positions", value: product.embroideryPositions?.map(p => p.name).join(', ') }
-            ]
-          }))
-        }
-      }));
-
       try {
         // Create orders one by one to handle potential errors
-        for (const orderData of shopifyOrders) {
+        for (const order of orders) {
+          const orderData = {
+            order: {
+              email: order.customer.email,
+              phone: order.customer.phone,
+              billing_address: {
+                first_name: order.customer.name,
+                address1: order.customer.address,
+              },
+              line_items: order.products.map(product => ({
+                title: product.name,
+                quantity: product.quantity,
+                price: product.price.toString(),
+                sku: product.sku,
+                properties: [
+                  { name: "Color", value: product.color },
+                  { name: "Size", value: product.size },
+                  { name: "Embroidery Positions", value: product.embroideryPositions?.map(p => p.name).join(', ') }
+                ]
+              }))
+            }
+          };
+
           const response = await fetch(
             `https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/${SHOPIFY_API_VERSION}/orders.json`,
             {
@@ -152,29 +168,24 @@ export default function Shopify() {
             throw new Error(`Lỗi Shopify API: ${JSON.stringify(errorData.errors)}`);
           }
 
-          const data = await response.json();
-          console.log('Shopify order created:', data);
-        }
-
-        // Update synced status in Firebase
-        for (const order of orders) {
+          // Update imported status in Firebase
           const orderRef = doc(db, "shopify_orders", order.id);
           await updateDoc(orderRef, {
-            synced: true,
-            syncedAt: new Date().toISOString()
+            imported: true,
+            importedAt: new Date().toISOString()
           });
         }
 
         return true;
       } catch (error: any) {
-        console.error('Shopify sync error:', error);
-        throw new Error(error.message || 'Lỗi khi đồng bộ với Shopify');
+        console.error('Shopify import error:', error);
+        throw new Error(error.message || 'Lỗi khi import lên Shopify');
       }
     },
     onSuccess: () => {
       toast({
         title: "Thành công",
-        description: "Đã đồng bộ đơn hàng lên Shopify"
+        description: "Đã import đơn hàng lên Shopify"
       });
       refetch();
     },
@@ -187,23 +198,86 @@ export default function Shopify() {
     }
   });
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      importOrders.mutate(file);
-    }
-  };
-
-  const handleSyncToShopify = () => {
+  const handleImportToShopify = () => {
     if (pendingOrders.length > 0) {
-      syncToShopify.mutate(pendingOrders);
+      importToShopify.mutate(pendingOrders);
     } else {
       toast({
         title: "Thông báo",
-        description: "Không có đơn hàng cần đồng bộ"
+        description: "Không có đơn hàng cần import"
       });
     }
   };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const csvData = e.target?.result as string;
+        const results = Papa.parse(csvData, { header: true });
+        const orders = [];
+
+        for (const row of results.data as any[]) {
+          if (!row.Name || !row.Email) continue;
+
+          const orderData = {
+            orderNumber: row.Name,
+            imported: false,
+            customer: {
+              name: row['Billing Name'] || '',
+              email: row.Email || '',
+              phone: row.Phone || '',
+              address: row['Billing Address1'] || ''
+            },
+            products: [{
+              name: row['Lineitem name'] || '',
+              quantity: parseInt(row['Lineitem quantity']) || 1,
+              price: parseFloat(row['Lineitem price']) || 0,
+              sku: row['Lineitem sku'] || '',
+              color: row['Lineitem properties Color'] || '',
+              size: row['Lineitem properties Size'] || '',
+              embroideryPositions: row.Notes ?
+                row.Notes.split(',').map((pos: string) => ({
+                  name: pos.trim(),
+                  description: '',
+                })) : []
+            }],
+            createdAt: new Date().toISOString(),
+            total: parseFloat(row.Total) || 0,
+          };
+
+          const existingOrdersQuery = query(
+            collection(db, "shopify_orders"),
+            where("orderNumber", "==", orderData.orderNumber)
+          );
+          const existingOrders = await getDocs(existingOrdersQuery);
+
+          if (existingOrders.empty) {
+            await addDoc(collection(db, "shopify_orders"), orderData);
+            orders.push(orderData);
+          }
+        }
+
+        toast({
+          title: "Thành công",
+          description: `Đã import ${orders.length} đơn hàng từ file CSV`
+        });
+        refetch();
+      } catch (error: any) {
+        console.error('CSV import error:', error);
+        toast({
+          title: "Lỗi",
+          description: error.message || 'Lỗi khi import file CSV',
+          variant: "destructive"
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
 
   if (isLoading) {
     return <div>Đang tải...</div>;
@@ -215,6 +289,15 @@ export default function Shopify() {
         <h1 className="text-2xl sm:text-3xl font-bold">Đồng bộ Shopify</h1>
 
         <div className="w-full sm:w-auto flex gap-2">
+          <Button
+            onClick={() => syncFromShopify.mutate()}
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={syncFromShopify.isPending}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncFromShopify.isPending ? 'animate-spin' : ''}`} />
+            Đồng bộ từ Shopify
+          </Button>
           <Input
             type="file"
             accept=".csv"
@@ -230,20 +313,20 @@ export default function Shopify() {
               </span>
             </Button>
           </label>
-          <Button 
-            onClick={handleSyncToShopify}
+          <Button
+            onClick={handleImportToShopify}
             className="w-full sm:w-auto"
-            disabled={pendingOrders.length === 0 || syncToShopify.isPending}
+            disabled={pendingOrders.length === 0 || importToShopify.isPending}
           >
-            <RefreshCw className={`mr-2 h-4 w-4 ${syncToShopify.isPending ? 'animate-spin' : ''}`} />
-            Đồng bộ ({pendingOrders.length})
+            <Upload className="mr-2 h-4 w-4" />
+            Import lên Shopify ({pendingOrders.length})
           </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Đơn hàng chờ đồng bộ</CardTitle>
+          <CardTitle>Đơn hàng chờ import</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -293,7 +376,7 @@ export default function Shopify() {
               {pendingOrders.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Không có đơn hàng nào chờ đồng bộ
+                    Không có đơn hàng nào chờ import
                   </TableCell>
                 </TableRow>
               )}
