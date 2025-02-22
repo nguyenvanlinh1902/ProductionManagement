@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,20 +17,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, Eye, Upload } from "lucide-react";
-import Papa from 'papaparse';
+import { Download, Eye, RefreshCw } from "lucide-react";
 import QRCode from "qrcode";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
-import type { 
-  ShopifyOrder, 
-  EmbroideryPosition, 
-  Product, 
-  ProductionStage 
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import type {
+  ShopifyOrder,
+  EmbroideryPosition,
+  Product,
+  ProductionStage
 } from "@/lib/types";
+import { useLocation } from "wouter";
 
 export default function Orders() {
+  const [_, navigate] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<ShopifyOrder | null>(null);
   const { toast } = useToast();
@@ -52,7 +53,7 @@ export default function Orders() {
   // Xác định độ phức tạp của đơn hàng
   const determineOrderComplexity = (products: Product[]) => {
     let hasMultipleProducts = products.length > 1;
-    let hasMultiplePositions = products.some(p => 
+    let hasMultiplePositions = products.some(p =>
       p.embroideryPositions && p.embroideryPositions.length > 1
     );
 
@@ -66,172 +67,6 @@ export default function Orders() {
     return 'simple';
   };
 
-  // Import đơn hàng từ CSV
-  const importOrders = useMutation({
-    mutationFn: async (file: File) => {
-      return new Promise((resolve, reject) => {
-        Papa.parse(file, {
-          header: true,
-          complete: async (results) => {
-            try {
-              for (const row of results.data as any[]) {
-                if (!row.Name || !row.Email) continue;
-
-                // Xử lý thông tin vị trí thêu từ notes
-                const embroideryPositions: EmbroideryPosition[] = [];
-                if (row.Notes) {
-                  const positions = row.Notes.split(',').map((pos: string) => ({
-                    name: pos.trim(),
-                    description: '',
-                  }));
-                  embroideryPositions.push(...positions);
-                }
-
-                // Tạo sản phẩm với thông tin chi tiết
-                const product: Product = {
-                  name: row['Lineitem name'] || '',
-                  quantity: parseInt(row['Lineitem quantity']) || 1,
-                  price: parseFloat(row['Lineitem price']) || 0,
-                  sku: row['Lineitem sku'] || '',
-                  color: row['Lineitem properties Color'] || '',
-                  size: row['Lineitem properties Size'] || '',
-                  embroideryPositions
-                };
-
-                // Tạo các công đoạn sản xuất mặc định
-                const stages: ProductionStage[] = [
-                  { id: 'cutting', name: 'Cắt', status: 'pending' },
-                  { id: 'sewing', name: 'May', status: 'pending' },
-                  { id: 'embroidery', name: 'Thêu', status: 'pending' },
-                  { id: 'finishing', name: 'Hoàn thiện', status: 'pending' },
-                  { id: 'quality', name: 'Kiểm tra chất lượng', status: 'pending' },
-                  { id: 'packaging', name: 'Đóng gói', status: 'pending' }
-                ];
-
-                // Xác định độ phức tạp
-                const complexity = determineOrderComplexity([product]);
-
-                // Tạo đơn hàng mới
-                await addDoc(collection(db, "shopify_orders"), {
-                  orderNumber: row.Name,
-                  customer: {
-                    name: row['Billing Name'] || '',
-                    email: row.Email || '',
-                    phone: row.Phone || '',
-                    address: row['Billing Address1'] || ''
-                  },
-                  products: [product],
-                  stages,
-                  status: 'pending',
-                  notes: row.Notes || '',
-                  createdAt: new Date().toISOString(),
-                  deadline: row['Paid at'] || null,
-                  total: parseFloat(row.Total) || 0,
-                  qrCode: null,
-                  complexity
-                });
-              }
-              resolve(true);
-            } catch (error) {
-              reject(error);
-            }
-          },
-          error: (error) => reject(error)
-        });
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Thành công",
-        description: "Đã import đơn hàng"
-      });
-      refetch();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Lỗi",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  // Import đơn hàng lên Shopify
-  const exportToShopify = useMutation({
-    mutationFn: async (orders: ShopifyOrder[]) => {
-      const shopifyOrdersData = orders.map(order => ({
-        email: order.customer.email,
-        phone: order.customer.phone,
-        billing_address: {
-          first_name: order.customer.name,
-          address1: order.customer.address,
-        },
-        line_items: order.products.map(product => ({
-          title: product.name,
-          quantity: product.quantity,
-          price: product.price,
-          sku: product.sku,
-          properties: {
-            Color: product.color,
-            Size: product.size,
-            'Embroidery Positions': product.embroideryPositions?.map(p => p.name).join(', ')
-          }
-        }))
-      }));
-
-      // Gửi dữ liệu lên Shopify API
-      try {
-        const response = await fetch(`https://${import.meta.env.VITE_SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN
-          },
-          body: JSON.stringify({ orders: shopifyOrdersData })
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to export orders to Shopify');
-        }
-
-        return await response.json();
-      } catch (error: any) {
-        throw new Error(error.message);
-      }
-    },
-    onSuccess: () => {
-      toast({
-        title: "Thành công",
-        description: "Đã xuất đơn hàng lên Shopify"
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Lỗi",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      importOrders.mutate(file);
-    }
-  };
-
-  const handleExportToShopify = () => {
-    if (orders.length > 0) {
-      exportToShopify.mutate(orders);
-    } else {
-      toast({
-        title: "Lỗi",
-        description: "Không có đơn hàng để xuất",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleOrderSelect = async (order: ShopifyOrder) => {
     if (!order.qrCode) {
@@ -269,28 +104,13 @@ export default function Orders() {
         <h1 className="text-2xl sm:text-3xl font-bold">Đơn hàng</h1>
 
         <div className="w-full sm:w-auto flex gap-2">
-          <Input
-            type="file"
-            accept=".csv"
-            onChange={handleFileUpload}
-            className="hidden"
-            id="csv-upload"
-          />
-          <label htmlFor="csv-upload" className="w-full sm:w-auto">
-            <Button variant="outline" className="w-full sm:w-auto" asChild>
-              <span>
-                <Upload className="mr-2 h-4 w-4" />
-                Import CSV
-              </span>
-            </Button>
-          </label>
-          <Button 
-            onClick={handleExportToShopify}
+          <Button
+            onClick={() => navigate('/shopify')}
+            variant="outline"
             className="w-full sm:w-auto"
-            disabled={orders.length === 0 || exportToShopify.isPending}
           >
-            <Upload className="mr-2 h-4 w-4" />
-            Xuất lên Shopify
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Đồng bộ Shopify
           </Button>
         </div>
       </div>
@@ -384,9 +204,9 @@ export default function Orders() {
                 </TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button 
-                      onClick={() => handleOrderSelect(order)} 
-                      variant="ghost" 
+                    <Button
+                      onClick={() => handleOrderSelect(order)}
+                      variant="ghost"
                       size="icon"
                     >
                       <Eye className="h-4 w-4" />
@@ -459,7 +279,7 @@ export default function Orders() {
               <div className="space-y-4">
                 <div>
                   <h3 className="font-semibold mb-2">
-                    Mã QR 
+                    Mã QR
                     <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
                       selectedOrder.complexity === 'very_complex' ? 'bg-red-100 text-red-800' :
                       selectedOrder.complexity === 'complex' ? 'bg-orange-100 text-orange-800' :
@@ -474,8 +294,8 @@ export default function Orders() {
                   </h3>
                   {selectedOrder.qrCode && (
                     <div className="bg-white p-4 rounded-lg">
-                      <img 
-                        src={selectedOrder.qrCode} 
+                      <img
+                        src={selectedOrder.qrCode}
                         alt="QR Code"
                         className="w-40 h-40 mx-auto"
                       />

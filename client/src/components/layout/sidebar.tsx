@@ -20,6 +20,7 @@ const menuItems: MenuItem[] = [
   { label: "Production", path: "/production", icon: "🏭" },
   { label: "Scan", path: "/scan", icon: "📱", requiredRole: "worker" },
   { label: "Users", path: "/users", icon: "👥", requiredRole: "admin" },
+  { label: "Shopify", path: "/shopify", icon: "🔄", requiredRole: "admin" },
   { label: "Settings", path: "/settings", icon: "⚙️", requiredRole: "admin" }
 ];
 
