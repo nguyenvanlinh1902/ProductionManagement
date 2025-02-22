@@ -27,7 +27,7 @@ import {
 } from "firebase/firestore";
 import type { ShopifyOrder } from "@/lib/types";
 
-const SHOPIFY_API_VERSION = "2025-01";
+const SHOPIFY_API_VERSION = "2024-01";
 
 // Add validation for Shopify credentials
 const validateShopifyCredentials = () => {
