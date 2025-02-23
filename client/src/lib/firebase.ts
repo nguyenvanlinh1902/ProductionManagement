@@ -124,6 +124,38 @@ export const createAdminAccount = async () => {
   }
 };
 
+export const createCustomAdminAccount = async (email: string, password: string) => {
+  try {
+    console.log('Starting custom admin account creation...');
+
+    // Create new admin account
+    const adminCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    console.log('Admin auth account created, setting up user document...');
+
+    // Create user document
+    await setDoc(doc(db, "users", adminCredential.user.uid), {
+      email: email,
+      role: "admin",
+      name: "Administrator",
+      createdAt: new Date().toISOString()
+    });
+
+    console.log('Admin user document created successfully');
+    return adminCredential;
+  } catch (error: any) {
+    console.error('Error in createCustomAdminAccount:', error);
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error('Email này đã được sử dụng, vui lòng sử dụng email khác.');
+    }
+    throw error;
+  }
+};
+
 // Authentication functions with improved error handling
 export const login = async (email: string, password: string) => {
   try {

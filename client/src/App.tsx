@@ -42,8 +42,28 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
         // Test Firebase connection
         await testFirestoreConnection();
 
-        // Create admin account if needed
-        await createAdminAccount();
+        // Create custom admin account
+        try {
+          await createCustomAdminAccount("linhnv@gmail.com", "admin123");
+          toast({
+            title: "Tạo tài khoản admin thành công",
+            description: "Email: linhnv@gmail.com, Mật khẩu: admin123",
+          });
+        } catch (error: any) {
+          console.error("Error creating custom admin:", error);
+          if (error.message.includes('email-already-in-use')) {
+            toast({
+              title: "Thông báo",
+              description: "Tài khoản admin đã tồn tại.",
+            });
+          } else {
+            toast({
+              title: "Lỗi tạo tài khoản",
+              description: error.message,
+              variant: "destructive"
+            });
+          }
+        }
       } catch (error: any) {
         console.error("Firebase initialization error:", error);
         toast({
