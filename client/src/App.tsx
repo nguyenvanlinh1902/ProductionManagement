@@ -20,6 +20,7 @@ import Scan from "@/pages/scan";
 import Shopify from "@/pages/shopify";
 import Machines from "@/pages/machines"; 
 import MachineGroupView from "@/pages/machine-group";
+import MachineMonitor from './pages/machine-monitor'; // Added import
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
