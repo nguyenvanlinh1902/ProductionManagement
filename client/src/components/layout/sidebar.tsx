@@ -11,7 +11,7 @@ interface MenuItem {
   label: string;
   path: string;
   icon: string;
-  requiredRole?: string;
+  requiredRole?: string | string[];
 }
 
 const menuItems: MenuItem[] = [
@@ -50,6 +50,9 @@ export function Sidebar() {
   // Filter menu items based on user role
   const filteredMenuItems = menuItems.filter(item => {
     if (!item.requiredRole) return true;
+    if (Array.isArray(item.requiredRole)) {
+      return item.requiredRole.includes(userRole!) || userRole === 'admin';
+    }
     return userRole === item.requiredRole || userRole === 'admin';
   });
 

@@ -72,7 +72,7 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
     return <LoadingSpinner />;
   }
 
-  if (!auth.currentUser || (requiredRole && userRole !== requiredRole)) {
+  if (!auth.currentUser || (requiredRole && userRole !== requiredRole && !Array.isArray(requiredRole) && requiredRole.includes(userRole) === false) ) {
     window.location.href = '/login';
     return null;
   }
@@ -137,12 +137,12 @@ function Router() {
         </PrivateRoute>
       </Route>
       <Route path="/machines">
-        <PrivateRoute requiredRole="admin">
+        <PrivateRoute requiredRole={["admin", "machine_manager"]}>
           <Machines />
         </PrivateRoute>
       </Route>
       <Route path="/machine-group">
-        <PrivateRoute requiredRole={["manager", "machine_manager"]}>
+        <PrivateRoute requiredRole={["manager", "machine_manager", "admin"]}>
           <MachineGroupView />
         </PrivateRoute>
       </Route>

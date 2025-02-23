@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -18,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Play, Pause, CheckCircle2, Timer, ArrowRight } from "lucide-react";
+import { Play, Pause, CheckCircle2, Timer, ArrowRight, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import {
@@ -38,11 +45,27 @@ import type {
   MachineRecommendation 
 } from "@/lib/types";
 import { THREAD_COLORS } from "@/lib/constants";
+import { cn } from "@/lib/utils"; 
 
 export default function MachineGroupView() {
   const { toast } = useToast();
   const [selectedMachine, setSelectedMachine] = useState<SewingMachine | null>(null);
   const [completionDialog, setCompletionDialog] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [userRole, setUserRole] = useState<string | null>(null); 
+  // Fetch all machine groups (for admin)
+  const { data: allGroups = [] } = useQuery<MachineGroup[]>({
+    queryKey: ['/api/machine-groups'],
+    queryFn: async () => {
+      const groupsRef = collection(db, "machine_groups");
+      const snapshot = await getDocs(groupsRef);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as MachineGroup[];
+    },
+    enabled: userRole === 'admin'
+  });
 
   // Fetch machine group for current user
   const { data: machineGroup } = useQuery<MachineGroup>({
@@ -50,32 +73,36 @@ export default function MachineGroupView() {
     queryFn: async () => {
       // TODO: Get current user ID
       const userId = "current-user-id";
-      
+
       const groupsRef = collection(db, "machine_groups");
       const q = query(groupsRef, where("managerId", "==", userId));
       const snapshot = await getDocs(q);
-      
+
       if (snapshot.empty) {
         throw new Error("Không tìm thấy nhóm máy được phân công");
       }
-      
+
       return {
         id: snapshot.docs[0].id,
         ...snapshot.docs[0].data()
       } as MachineGroup;
-    }
+    },
+    enabled: userRole !== 'admin'
   });
+
+  // Get effective group ID based on role and selection
+  const effectiveGroupId = userRole === 'admin' ? selectedGroupId : machineGroup?.id;
 
   // Fetch machines in group
   const { data: machines = [], refetch: refetchMachines } = useQuery<SewingMachine[]>({
-    queryKey: ['/api/machines', machineGroup?.id],
-    enabled: !!machineGroup,
+    queryKey: ['/api/machines', effectiveGroupId],
+    enabled: !!effectiveGroupId,
     queryFn: async () => {
-      if (!machineGroup) return [];
+      if (!effectiveGroupId) return [];
 
       const machinesRef = collection(db, "sewing_machines");
       const snapshot = await getDocs(
-        query(machinesRef, where("id", "in", machineGroup.machineIds))
+        query(machinesRef, where("id", "in", allGroups.find(g => g.id === effectiveGroupId)?.machineIds || machineGroup?.machineIds || []))
       );
 
       return snapshot.docs.map(doc => ({
@@ -87,7 +114,8 @@ export default function MachineGroupView() {
 
   // Fetch active operations
   const { data: operations = [], refetch: refetchOperations } = useQuery<MachineOperation[]>({
-    queryKey: ['/api/operations/active'],
+    queryKey: ['/api/operations/active', effectiveGroupId],
+    enabled: !!effectiveGroupId,
     queryFn: async () => {
       const opsRef = collection(db, "machine_operations");
       const q = query(
@@ -140,7 +168,7 @@ export default function MachineGroupView() {
     }
   });
 
-  if (!machineGroup) {
+  if (!machineGroup && !selectedGroupId) {
     return <div>Đang tải...</div>;
   }
 
@@ -149,9 +177,26 @@ export default function MachineGroupView() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Quản lý nhóm máy</h1>
-          <p className="text-muted-foreground">
-            Người quản lý: {machineGroup.managerName}
-          </p>
+          {userRole === 'admin' ? (
+            <div className="flex items-center gap-4 mt-2">
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Chọn nhóm máy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allGroups.map(group => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name} - {group.managerName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              Người quản lý: {machineGroup?.managerName}
+            </p>
+          )}
         </div>
       </div>
 
@@ -174,21 +219,30 @@ export default function MachineGroupView() {
             <TableBody>
               {machines.map((machine) => {
                 const operation = operations.find(op => op.machineId === machine.id);
-                
+
                 return (
                   <TableRow key={machine.id}>
                     <TableCell className="font-medium">{machine.name}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "flex items-center gap-2 p-2 rounded-lg",
+                        operation ? "bg-green-50" : "bg-yellow-50",
+                        operation && "animate-pulse"
+                      )}>
                         {operation ? (
                           <>
                             <Play className="w-4 h-4 text-green-500" />
-                            <span>Đang hoạt động</span>
+                            <span className="text-green-700">Đang hoạt động</span>
+                          </>
+                        ) : machine.status === 'maintenance' ? (
+                          <>
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-red-700">Đang bảo trì</span>
                           </>
                         ) : (
                           <>
                             <Pause className="w-4 h-4 text-yellow-500" />
-                            <span>Đang rảnh</span>
+                            <span className="text-yellow-700">Đang rảnh</span>
                           </>
                         )}
                       </div>
@@ -197,7 +251,7 @@ export default function MachineGroupView() {
                       {machine.currentThreadColor && (
                         <div className="flex items-center gap-2">
                           <div 
-                            className="w-4 h-4 rounded-full" 
+                            className="w-4 h-4 rounded-full border" 
                             style={{ backgroundColor: machine.currentThreadColor }}
                           />
                           {THREAD_COLORS.find(c => c.hex === machine.currentThreadColor)?.name}
@@ -210,11 +264,11 @@ export default function MachineGroupView() {
                     <TableCell>
                       {operation && (
                         <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 text-gray-600">
                             <Timer className="w-4 h-4" />
                             Bắt đầu: {new Date(operation.startTime).toLocaleTimeString()}
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 text-gray-600">
                             <ArrowRight className="w-4 h-4" />
                             Dự kiến: {new Date(operation.estimatedEndTime).toLocaleTimeString()}
                           </div>
@@ -230,6 +284,7 @@ export default function MachineGroupView() {
                             setSelectedMachine(machine);
                             completeOperation.mutate(operation);
                           }}
+                          className="hover:bg-green-50 hover:text-green-600 hover:border-green-200"
                         >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
                           Hoàn thành
