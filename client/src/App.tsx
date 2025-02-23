@@ -2,7 +2,7 @@ import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { auth, getUserRole, createAdminAccount, testFirestoreConnection } from "@/lib/firebase";
+import { auth, getUserRole, testFirestoreConnection } from "@/lib/firebase";
 import { useEffect, useState, Suspense } from "react";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { useToast } from "@/hooks/use-toast";
@@ -18,9 +18,8 @@ import Settings from "@/pages/settings";
 import Users from "@/pages/users";
 import Scan from "@/pages/scan";
 import Shopify from "@/pages/shopify";
-import Machines from "@/pages/machines"; // Add import
-import MachineGroupView from "@/pages/machine-group"; // Added import
-
+import Machines from "@/pages/machines"; 
+import MachineGroupView from "@/pages/machine-group";
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -44,29 +43,6 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
       try {
         // Test Firebase connection
         await testFirestoreConnection();
-
-        // Create custom admin account
-        try {
-          await createAdminAccount("linhnv@gmail.com", "admin123");
-          toast({
-            title: "Tạo tài khoản admin thành công",
-            description: "Email: linhnv@gmail.com, Mật khẩu: admin123",
-          });
-        } catch (error: any) {
-          console.error("Error creating custom admin:", error);
-          if (error.message.includes('email-already-in-use')) {
-            toast({
-              title: "Thông báo",
-              description: "Tài khoản admin đã tồn tại.",
-            });
-          } else {
-            toast({
-              title: "Lỗi tạo tài khoản",
-              description: error.message,
-              variant: "destructive"
-            });
-          }
-        }
       } catch (error: any) {
         console.error("Firebase initialization error:", error);
         toast({
@@ -164,11 +140,11 @@ function Router() {
           <Machines />
         </PrivateRoute>
       </Route>
-      <Route path="/machine-group"> {/* Added route */}
-        <PrivateRoute>
+      <Route path="/machine-group">
+        <PrivateRoute requiredRole="manager">
           <MachineGroupView />
         </PrivateRoute>
-      </Route> {/* Added route */}
+      </Route>
       <Route path="/settings">
         <PrivateRoute requiredRole="admin">
           <Settings />

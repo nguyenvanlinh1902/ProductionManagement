@@ -21,6 +21,8 @@ const menuItems: MenuItem[] = [
   { label: "Quét mã QR", path: "/scan", icon: "📱", requiredRole: "worker" },
   { label: "Kho hàng", path: "/warehouse", icon: "🏪", requiredRole: "admin" },
   { label: "Người dùng", path: "/users", icon: "👥", requiredRole: "admin" },
+  { label: "Quản lý máy", path: "/machines", icon: "⚙️", requiredRole: "admin" },
+  { label: "Nhóm máy", path: "/machine-group", icon: "🔧", requiredRole: "manager" },
   { label: "Shopify", path: "/shopify", icon: "🔄", requiredRole: "admin" },
   { label: "Cài đặt", path: "/settings", icon: "⚙️", requiredRole: "admin" }
 ];
