@@ -18,6 +18,7 @@ import Settings from "@/pages/settings";
 import Users from "@/pages/users";
 import Scan from "@/pages/scan";
 import Shopify from "@/pages/shopify";
+import Machines from "@/pages/machines"; // Add import
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -44,7 +45,7 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
 
         // Create custom admin account
         try {
-          await createCustomAdminAccount("linhnv@gmail.com", "admin123");
+          await createAdminAccount("linhnv@gmail.com", "admin123");
           toast({
             title: "Tạo tài khoản admin thành công",
             description: "Email: linhnv@gmail.com, Mật khẩu: admin123",
@@ -154,6 +155,11 @@ function Router() {
       <Route path="/shopify">
         <PrivateRoute requiredRole="admin">
           <Shopify />
+        </PrivateRoute>
+      </Route>
+      <Route path="/machines">
+        <PrivateRoute requiredRole="admin">
+          <Machines />
         </PrivateRoute>
       </Route>
       <Route path="/settings">

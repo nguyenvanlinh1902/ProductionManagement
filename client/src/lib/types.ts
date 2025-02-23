@@ -100,3 +100,70 @@ export const shopifyOrderSchema = z.object({
   qrCode: z.string().nullable(),
   complexity: z.enum(['simple', 'medium', 'complex', 'very_complex'])
 });
+
+export interface SewingMachine {
+  id: string;
+  name: string;
+  managerId: string;
+  managerName: string;
+  status: 'idle' | 'working' | 'maintenance';
+  currentThreadColor?: string;
+  currentProductId?: string;
+  currentProductName?: string;
+  startTime?: string;
+  estimatedEndTime?: string;
+}
+
+export interface MachineHistory {
+  id: string;
+  machineId: string;
+  productId: string;
+  threadColor: string;
+  startTime: string;
+  endTime: string;
+  status: 'completed' | 'interrupted' | 'maintenance';
+  notes?: string;
+}
+
+export interface MachineRecommendation {
+  machineId: string;
+  productId: string;
+  priority: number;
+  reason: string;
+  estimatedTime: number;
+  threadColor: string;
+}
+
+// Zod schemas for new types
+export const sewingMachineSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  managerId: z.string(),
+  managerName: z.string(),
+  status: z.enum(['idle', 'working', 'maintenance']),
+  currentThreadColor: z.string().optional(),
+  currentProductId: z.string().optional(),
+  currentProductName: z.string().optional(),
+  startTime: z.string().optional(),
+  estimatedEndTime: z.string().optional()
+});
+
+export const machineHistorySchema = z.object({
+  id: z.string(),
+  machineId: z.string(),
+  productId: z.string(),
+  threadColor: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  status: z.enum(['completed', 'interrupted', 'maintenance']),
+  notes: z.string().optional()
+});
+
+export const machineRecommendationSchema = z.object({
+  machineId: z.string(),
+  productId: z.string(),
+  priority: z.number(),
+  reason: z.string(),
+  estimatedTime: z.number(),
+  threadColor: z.string()
+});
