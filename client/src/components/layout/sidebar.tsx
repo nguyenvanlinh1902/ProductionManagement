@@ -16,12 +16,13 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: "📊" },
-  { label: "Orders", path: "/orders", icon: "📦", requiredRole: "admin" },
-  { label: "Production", path: "/production", icon: "🏭" },
-  { label: "Scan", path: "/scan", icon: "📱", requiredRole: "worker" },
-  { label: "Users", path: "/users", icon: "👥", requiredRole: "admin" },
+  { label: "Đơn hàng", path: "/orders", icon: "📦", requiredRole: "admin" },
+  { label: "Sản xuất", path: "/production", icon: "🏭" },
+  { label: "Quét mã QR", path: "/scan", icon: "📱", requiredRole: "worker" },
+  { label: "Kho hàng", path: "/warehouse", icon: "🏪", requiredRole: "admin" },
+  { label: "Người dùng", path: "/users", icon: "👥", requiredRole: "admin" },
   { label: "Shopify", path: "/shopify", icon: "🔄", requiredRole: "admin" },
-  { label: "Settings", path: "/settings", icon: "⚙️", requiredRole: "admin" }
+  { label: "Cài đặt", path: "/settings", icon: "⚙️", requiredRole: "admin" }
 ];
 
 export function Sidebar() {
@@ -46,7 +47,7 @@ export function Sidebar() {
   // Filter menu items based on user role
   const filteredMenuItems = menuItems.filter(item => {
     if (!item.requiredRole) return true;
-    return userRole === item.requiredRole;
+    return userRole === item.requiredRole || userRole === 'admin';
   });
 
   // Mobile navigation bar at bottom
