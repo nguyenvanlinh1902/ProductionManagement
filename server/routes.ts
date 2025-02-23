@@ -17,21 +17,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: result.error });
       return;
     }
-    
+
     const order = await storage.createOrder(result.data);
     const qrCode = await QRCode.toDataURL(order.id);
-    
+
     await storage.updateOrder(order.id, {
       ...order,
       qrCode,
       stages: {
         cutting: { completed: false },
         sewing: { completed: false },
-        packaging: { completed: false }
-      }
+        packaging: { completed: false },
+      },
     });
-    
-    res.json({...order, qrCode});
+
+    res.json({ ...order, qrCode });
   });
 
   // Products API
@@ -40,30 +40,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(products);
   });
 
+  // Shopify Proxy API
+  app.get("/api/shopify/orders", async (req, res) => {
+    try {
+      const shopifyUrl = `https://${process.env.VITE_SHOPIFY_STORE_URL}/admin/api/2025-01/orders.json?status=any`;
+      const response = await fetch(shopifyUrl, {
+        headers: {
+          "X-Shopify-Access-Token": process.env.VITE_SHOPIFY_ACCESS_TOKEN,
+          "Content-Type": "application/json",
+        },
+      });
 
-
-// Shopify Proxy API
-app.get("/api/shopify/orders", async (req, res) => {
-  try {
-    const shopifyUrl = `https://${process.env.VITE_SHOPIFY_STORE_URL}/admin/api/2024-01/orders.json?status=any`;
-    const response = await fetch(shopifyUrl, {
-      headers: {
-        "X-Shopify-Access-Token": process.env.VITE_SHOPIFY_ACCESS_TOKEN,
-        "Content-Type": "application/json"
+      if (!response.ok) {
+        throw new Error(`Shopify API error: ${response.status}`);
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Shopify API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.post("/api/products", async (req, res) => {
     const result = insertProductSchema.safeParse(req.body);
@@ -77,7 +74,9 @@ app.get("/api/shopify/orders", async (req, res) => {
 
   // Production Stages API
   app.get("/api/production-stages/:orderId", async (req, res) => {
-    const stages = await storage.getProductionStages(parseInt(req.params.orderId));
+    const stages = await storage.getProductionStages(
+      parseInt(req.params.orderId),
+    );
     res.json(stages);
   });
 

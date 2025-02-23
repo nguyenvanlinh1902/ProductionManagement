@@ -3,7 +3,7 @@ import { z } from "zod";
 export interface EmbroideryPosition {
   name: string;
   description: string;
-  designFile?: string;
+  designUrl?: string;
 }
 
 export interface Product {
@@ -48,11 +48,10 @@ export interface ShopifyOrder {
   complexity: 'simple' | 'medium' | 'complex' | 'very_complex';
 }
 
-// Schema for validation
 export const embroideryPositionSchema = z.object({
   name: z.string(),
   description: z.string(),
-  designFile: z.string().optional()
+  designUrl: z.string().optional()
 });
 
 export const productSchema = z.object({
@@ -77,7 +76,7 @@ export const productionStageSchema = z.object({
   name: z.string(),
   status: z.enum(['pending', 'in_progress', 'completed']),
   startedAt: z.string().optional(),
-  completedAt: z.string().optional(), 
+  completedAt: z.string().optional(),
   completedBy: z.string().optional(),
   notes: z.string().optional()
 });

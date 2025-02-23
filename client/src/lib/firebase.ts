@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Kiểm tra biến môi trường Firebase
 const requiredEnvVars = [
@@ -38,6 +39,7 @@ try {
 // Khởi tạo các services với xử lý lỗi
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Hàm test kết nối Firestore
 export const testFirestoreConnection = async () => {
