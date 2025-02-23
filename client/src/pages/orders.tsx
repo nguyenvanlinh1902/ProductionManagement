@@ -44,7 +44,12 @@ type OrderFormData = {
     quantity: number;
     color?: string;
     size?: string;
-    embroideryPositions: EmbroideryPosition[];
+    embroideryPositions: {
+      name: string;
+      description: string;
+      designUrl?: string;
+      status: 'pending' | 'in_progress' | 'completed';
+    }[];
   }[];
 };
 
@@ -100,9 +105,19 @@ export default function Orders() {
   const updateOrder = useMutation({
     mutationFn: async (data: { id: string; formData: OrderFormData }) => {
       const { id, formData } = data;
+      console.log('Updating order with data:', formData); 
+
       await updateDoc(doc(db, "shopify_orders", id), {
         customer: formData.customer,
-        products: formData.products
+        products: formData.products.map(product => ({
+          ...product,
+          embroideryPositions: product.embroideryPositions.map(pos => ({
+            name: pos.name,
+            description: pos.description,
+            designUrl: pos.designUrl,
+            status: pos.status
+          }))
+        }))
       });
     },
     onSuccess: () => {
@@ -114,6 +129,7 @@ export default function Orders() {
       refetch();
     },
     onError: (error: any) => {
+      console.error('Error updating order:', error); 
       toast({
         title: "Lỗi",
         description: error.message,
@@ -172,18 +188,22 @@ export default function Orders() {
     if (!file || !selectedOrder) return;
 
     try {
+      // Create preview URL immediately
+      const previewUrl = URL.createObjectURL(file);
+      const products = form.getValues('products');
+      products[productIndex].embroideryPositions[positionIndex].designUrl = previewUrl;
+      form.setValue('products', products);
+
+      // Upload file to Firebase Storage
       const downloadUrl = await uploadDesign(
         file,
         selectedOrder.id,
         `product_${productIndex}_position_${positionIndex}`
       );
 
-      // Update form data with new design URL
-      const products = form.getValues('products');
-      if (products[productIndex]?.embroideryPositions?.[positionIndex]) {
-        products[productIndex].embroideryPositions[positionIndex].designUrl = downloadUrl;
-        form.setValue('products', products);
-      }
+      // Update form with actual download URL
+      products[productIndex].embroideryPositions[positionIndex].designUrl = downloadUrl;
+      form.setValue('products', products);
     } catch (error: any) {
       toast({
         title: "Lỗi",
@@ -202,7 +222,8 @@ export default function Orders() {
     products[productIndex].embroideryPositions.push({
       name: '',
       description: '',
-      designUrl: ''
+      designUrl: '',
+      status: 'pending'
     });
     form.setValue('products', products);
   };
@@ -536,6 +557,30 @@ export default function Orders() {
                                   />
                                   <FormField
                                     control={form.control}
+                                    name={`products.${productIndex}.embroideryPositions.${posIndex}.status`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Trạng thái</FormLabel>
+                                        <FormControl>
+                                          <Select 
+                                            value={field.value} 
+                                            onValueChange={field.onChange}
+                                          >
+                                            <SelectTrigger>
+                                              <SelectValue placeholder="Chọn trạng thái" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="pending">Chờ xử lý</SelectItem>
+                                              <SelectItem value="in_progress">Đang thực hiện</SelectItem>
+                                              <SelectItem value="completed">Hoàn thành</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </FormControl>
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={form.control}
                                     name={`products.${productIndex}.embroideryPositions.${posIndex}.description`}
                                     render={({ field }) => (
                                       <FormItem>
@@ -624,7 +669,18 @@ export default function Orders() {
                                 <ul className="space-y-2 mt-1">
                                   {product.embroideryPositions.map((pos, idx) => (
                                     <li key={idx} className="border-l-2 border-gray-200 pl-3">
-                                      <div className="font-medium">{pos.name}</div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">{pos.name}</span>
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                          pos.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                          pos.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-yellow-100 text-yellow-800'
+                                        }`}>
+                                          {pos.status === 'completed' ? 'Hoàn thành' :
+                                           pos.status === 'in_progress' ? 'Đang thực hiện' :
+                                           'Chờ xử lý'}
+                                        </span>
+                                      </div>
                                       {pos.description && (
                                         <div className="text-sm text-gray-600 mt-1">
                                           {pos.description}
