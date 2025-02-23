@@ -243,6 +243,7 @@ export default function Shopify() {
         const response = await fetch('/api/shopify/orders');
 
 
+
         console.log("Response status:", response.status);
 
         if (!response.ok) {
@@ -478,40 +479,60 @@ export default function Shopify() {
       try {
         const csvData = e.target?.result as string;
         const results = Papa.parse(csvData, { header: true });
-        const orders = [];
+
+        // Group rows by order number
+        const orderGroups = new Map<string, any[]>();
 
         for (const row of results.data as any[]) {
           if (!row.Name || !row.Email) continue;
 
+          const orderNumber = row.Name;
+          if (!orderGroups.has(orderNumber)) {
+            orderGroups.set(orderNumber, []);
+          }
+          orderGroups.get(orderNumber)?.push(row);
+        }
+
+        // Process each order group
+        for (const [orderNumber, rows] of orderGroups) {
+          // Use first row for order/customer details
+          const firstRow = rows[0];
+
           const orderData = {
-            orderNumber: row.Name,
+            orderNumber: orderNumber,
             imported: false,
             customer: {
-              name: row["Billing Name"] || "",
-              email: row.Email || "",
-              phone: row.Phone || "",
-              address: row["Billing Address1"] || "",
+              name: firstRow["Billing Name"] || "",
+              email: firstRow.Email || "",
+              phone: firstRow.Phone || "",
+              address: firstRow["Billing Address1"] || "",
             },
-            products: [
-              {
-                name: row["Lineitem name"] || "",
-                quantity: parseInt(row["Lineitem quantity"]) || 1,
-                price: parseFloat(row["Lineitem price"]) || 0,
-                sku: row["Lineitem sku"] || "",
-                color: row["Lineitem properties Color"] || "",
-                size: row["Lineitem properties Size"] || "",
-                embroideryPositions: row.Notes
-                  ? row.Notes.split(",").map((pos: string) => ({
-                      name: pos.trim(),
-                      description: "",
-                    }))
-                  : [],
-              },
-            ],
-            createdAt: new Date().toISOString(),
-            total: parseFloat(row.Total) || 0,
+            products: rows.map((row) => ({
+              name: row["Lineitem name"] || "",
+              quantity: parseInt(row["Lineitem quantity"]) || 1,
+              price: parseFloat(row["Lineitem price"]) || 0,
+              sku: row["Lineitem sku"] || "",
+              color: "", 
+              size: "", 
+              embroideryPositions: row.Notes
+                ? row.Notes.split(",").map((pos: string) => ({
+                    name: pos.trim(),
+                    description: "",
+                    status: "pending" as const,
+                  }))
+                : [],
+            })),
+            status: "pending" as const,
+            createdAt: new Date(firstRow["Created at"] || new Date()).toISOString(),
+            total: parseFloat(firstRow.Total) || 0,
+            notes: firstRow.Notes || "",
+            deadline: null,
+            qrCode: null,
+            complexity: "simple" as const,
+            stages: [],
           };
 
+          // Check if order already exists
           const existingOrdersQuery = query(
             collection(db, "shopify_orders"),
             where("orderNumber", "==", orderData.orderNumber),
@@ -520,13 +541,12 @@ export default function Shopify() {
 
           if (existingOrders.empty) {
             await addDoc(collection(db, "shopify_orders"), orderData);
-            orders.push(orderData);
           }
         }
 
         toast({
           title: "Thành công",
-          description: `Đã import ${orders.length} đơn hàng từ file CSV`,
+          description: `Đã import ${orderGroups.size} đơn hàng từ file CSV`,
         });
         refetch();
       } catch (error: any) {
