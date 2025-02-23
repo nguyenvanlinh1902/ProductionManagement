@@ -19,6 +19,8 @@ import Users from "@/pages/users";
 import Scan from "@/pages/scan";
 import Shopify from "@/pages/shopify";
 import Machines from "@/pages/machines"; // Add import
+import MachineGroupView from "@/pages/machine-group"; // Added import
+
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -162,6 +164,11 @@ function Router() {
           <Machines />
         </PrivateRoute>
       </Route>
+      <Route path="/machine-group"> {/* Added route */}
+        <PrivateRoute>
+          <MachineGroupView />
+        </PrivateRoute>
+      </Route> {/* Added route */}
       <Route path="/settings">
         <PrivateRoute requiredRole="admin">
           <Settings />

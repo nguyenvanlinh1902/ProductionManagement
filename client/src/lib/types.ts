@@ -167,3 +167,47 @@ export const machineRecommendationSchema = z.object({
   estimatedTime: z.number(),
   threadColor: z.string()
 });
+
+// Thêm các interface mới
+export interface MachineGroup {
+  id: string;
+  name: string; // Tên nhóm máy
+  managerId: string;
+  managerName: string;
+  machineIds: string[]; // Danh sách ID các máy trong nhóm
+}
+
+export interface MachineOperation {
+  id: string;
+  machineId: string;
+  productId: string;
+  productName: string;
+  threadColor: string;
+  startTime: string;
+  estimatedEndTime: string;
+  actualEndTime?: string;
+  status: 'in_progress' | 'completed' | 'delayed';
+  notes?: string;
+}
+
+// Thêm Zod schemas
+export const machineGroupSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  managerId: z.string(),
+  managerName: z.string(),
+  machineIds: z.array(z.string())
+});
+
+export const machineOperationSchema = z.object({
+  id: z.string(),
+  machineId: z.string(),
+  productId: z.string(),
+  productName: z.string(),
+  threadColor: z.string(),
+  startTime: z.string(),
+  estimatedEndTime: z.string(),
+  actualEndTime: z.string().optional(),
+  status: z.enum(['in_progress', 'completed', 'delayed']),
+  notes: z.string().optional()
+});
