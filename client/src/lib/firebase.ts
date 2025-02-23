@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, browserLocalPersistence, setPersistence } from "firebase/auth";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 // Kiểm tra biến môi trường Firebase
@@ -50,18 +50,76 @@ setPersistence(auth, browserLocalPersistence)
     console.error('Error setting persistence:', error);
   });
 
-// Hàm test kết nối Firestore
-export const testFirestoreConnection = async () => {
+export const createAdminAccount = async () => {
   try {
-    const testDoc = doc(db, "_test_connection", "test");
-    await setDoc(testDoc, {
-      timestamp: new Date().toISOString()
+    console.log('Starting admin account creation process...');
+
+    // Kiểm tra xem tài khoản admin đã tồn tại chưa
+    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(usersRef);
+
+    // Xóa tất cả tài khoản admin cũ nếu có lỗi
+    for (const doc of snapshot.docs) {
+      const userData = doc.data();
+      if (userData.role === 'admin') {
+        console.log('Removing old admin account:', doc.id);
+        await deleteDoc(doc.ref);
+      }
+    }
+
+    console.log('Creating new admin account...');
+
+    // Tạo tài khoản admin mới
+    const adminCredential = await createUserWithEmailAndPassword(
+      auth,
+      "admin@demo.com",
+      "admin123"
+    );
+
+    console.log('Admin auth account created, setting up user document...');
+
+    // Tạo document trong collection users
+    await setDoc(doc(db, "users", adminCredential.user.uid), {
+      email: "admin@demo.com",
+      role: "admin",
+      name: "Administrator",
+      createdAt: new Date().toISOString()
     });
-    await getDoc(testDoc);
-    console.log('Firestore connection test successful');
-    return true;
+
+    console.log('Admin user document created successfully');
+
+    // Tạo các công đoạn sản xuất mặc định
+    const productionStages = [
+      { id: "cutting", name: "Cắt", order: 1 },
+      { id: "assembly", name: "May", order: 2 },
+      { id: "embroidery", name: "Thêu", order: 3 },
+      { id: "finishing", name: "Hoàn thiện", order: 4 },
+      { id: "quality", name: "Kiểm tra chất lượng", order: 5 },
+      { id: "packaging", name: "Đóng gói", order: 6 }
+    ];
+
+    await setDoc(doc(db, "settings", "productionStages"), {
+      stages: productionStages,
+      updatedAt: new Date().toISOString()
+    });
+
+    console.log('Production stages created successfully');
+    console.log('Admin account setup completed successfully');
+
+    return adminCredential;
   } catch (error: any) {
-    console.error('Firestore connection test failed:', error.message);
+    console.error('Error in createAdminAccount:', error);
+    if (error.code === 'auth/email-already-in-use') {
+      // Nếu email đã tồn tại, thử đăng nhập
+      try {
+        console.log('Admin email exists, attempting to sign in...');
+        const credential = await signInWithEmailAndPassword(auth, "admin@demo.com", "admin123");
+        return credential;
+      } catch (signInError: any) {
+        console.error('Error signing in as admin:', signInError);
+        throw signInError;
+      }
+    }
     throw error;
   }
 };
@@ -122,52 +180,19 @@ export const register = async (email: string, password: string, role: string, na
   }
 };
 
-export const createAdminAccount = async () => {
+
+// Hàm test kết nối Firestore
+export const testFirestoreConnection = async () => {
   try {
-    console.log('Checking for existing admin account...');
-
-    // Kiểm tra xem tài khoản admin đã tồn tại chưa
-    const usersRef = collection(db, "users");
-    const snapshot = await getDocs(usersRef);
-    const adminExists = snapshot.docs.some(doc => doc.data().role === "admin");
-
-    if (adminExists) {
-      console.log('Admin account already exists');
-      return null;
-    }
-
-    console.log('Creating admin account...');
-
-    // Tạo tài khoản admin
-    const adminCredential = await register(
-      "admin@demo.com",
-      "admin123",
-      "admin",
-      "Administrator"
-    );
-
-    console.log('Admin account created successfully');
-
-    // Tạo các công đoạn sản xuất mặc định
-    const productionStages = [
-      { id: "cutting", name: "Cắt", order: 1 },
-      { id: "assembly", name: "May", order: 2 },
-      { id: "embroidery", name: "Thêu", order: 3 },
-      { id: "finishing", name: "Hoàn thiện", order: 4 },
-      { id: "quality", name: "Kiểm tra chất lượng", order: 5 },
-      { id: "packaging", name: "Đóng gói", order: 6 }
-    ];
-
-    await setDoc(doc(db, "settings", "productionStages"), {
-      stages: productionStages,
-      updatedAt: new Date().toISOString()
+    const testDoc = doc(db, "_test_connection", "test");
+    await setDoc(testDoc, {
+      timestamp: new Date().toISOString()
     });
-
-    console.log('Production stages created successfully');
-
-    return adminCredential;
+    await getDoc(testDoc);
+    console.log('Firestore connection test successful');
+    return true;
   } catch (error: any) {
-    console.error('Error creating admin account:', error);
+    console.error('Firestore connection test failed:', error.message);
     throw error;
   }
 };
