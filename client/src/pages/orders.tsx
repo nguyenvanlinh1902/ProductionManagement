@@ -42,6 +42,8 @@ type OrderFormData = {
   products: {
     name: string;
     quantity: number;
+    price?: number;
+    sku?: string;
     color?: string;
     size?: string;
     embroideryPositions: {
@@ -105,20 +107,48 @@ export default function Orders() {
   const updateOrder = useMutation({
     mutationFn: async (data: { id: string; formData: OrderFormData }) => {
       const { id, formData } = data;
-      console.log('Updating order with data:', formData); 
+      console.log('Updating order with data:', formData);
 
-      await updateDoc(doc(db, "shopify_orders", id), {
-        customer: formData.customer,
-        products: formData.products.map(product => ({
-          ...product,
-          embroideryPositions: product.embroideryPositions.map(pos => ({
-            name: pos.name,
-            description: pos.description,
-            designUrl: pos.designUrl,
-            status: pos.status
-          }))
-        }))
-      });
+      // Format products data before saving
+      const formattedProducts = formData.products.map(product => ({
+        name: product.name,
+        quantity: Number(product.quantity),
+        price: Number(product.price) || 0,
+        sku: product.sku || "",
+        color: product.color || "",
+        size: product.size || "",
+        embroideryPositions: Array.isArray(product.embroideryPositions) 
+          ? product.embroideryPositions.map(pos => ({
+              name: pos.name || "",
+              description: pos.description || "",
+              designUrl: pos.designUrl || "",
+              status: pos.status || "pending"
+            }))
+          : []
+      }));
+
+      // Format customer data
+      const formattedCustomer = {
+        name: formData.customer.name || "",
+        email: formData.customer.email || "",
+        phone: formData.customer.phone || "",
+        address: formData.customer.address || ""
+      };
+
+      const updateData = {
+        customer: formattedCustomer,
+        products: formattedProducts,
+        updatedAt: new Date().toISOString()
+      };
+
+      console.log('Formatted update data:', updateData);
+
+      try {
+        await updateDoc(doc(db, "shopify_orders", id), updateData);
+      } catch (error: any) {
+        console.error('Firebase update error:', error);
+        throw new Error(`Lỗi cập nhật: ${error.message}`);
+      }
     },
     onSuccess: () => {
       toast({
@@ -129,7 +159,7 @@ export default function Orders() {
       refetch();
     },
     onError: (error: any) => {
-      console.error('Error updating order:', error); 
+      console.error('Error updating order:', error);
       toast({
         title: "Lỗi",
         description: error.message,
