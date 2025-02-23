@@ -4,6 +4,7 @@ export interface EmbroideryPosition {
   name: string;
   description: string;
   designUrl?: string;
+  status: 'pending' | 'in_progress' | 'completed'; // Added status field
 }
 
 export interface Product {
@@ -14,6 +15,7 @@ export interface Product {
   color: string;
   size: string;
   embroideryPositions: EmbroideryPosition[];
+  manufactured?: boolean; // Add manufactured flag
 }
 
 export interface Customer {
@@ -48,10 +50,12 @@ export interface ShopifyOrder {
   complexity: 'simple' | 'medium' | 'complex' | 'very_complex';
 }
 
+// Zod schemas
 export const embroideryPositionSchema = z.object({
   name: z.string(),
   description: z.string(),
-  designUrl: z.string().optional()
+  designUrl: z.string().optional(),
+  status: z.enum(['pending', 'in_progress', 'completed'])
 });
 
 export const productSchema = z.object({
@@ -61,7 +65,8 @@ export const productSchema = z.object({
   sku: z.string(),
   color: z.string(),
   size: z.string(),
-  embroideryPositions: z.array(embroideryPositionSchema)
+  embroideryPositions: z.array(embroideryPositionSchema),
+  manufactured: z.boolean().optional()
 });
 
 export const customerSchema = z.object({

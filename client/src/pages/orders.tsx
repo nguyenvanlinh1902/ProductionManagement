@@ -76,17 +76,22 @@ export default function Orders() {
     fetchStages();
   }, []);
 
-  // Get orders list
+  // Get orders list with improved error handling
   const { data: orders = [], isLoading, refetch } = useQuery<ShopifyOrder[]>({
     queryKey: ['/api/orders'],
     queryFn: async () => {
-      const ordersRef = collection(db, "shopify_orders");
-      const q = query(ordersRef, orderBy("createdAt", "desc"));
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ShopifyOrder[];
+      try {
+        const ordersRef = collection(db, "shopify_orders");
+        const q = query(ordersRef, orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as ShopifyOrder[];
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        throw new Error('Failed to fetch orders');
+      }
     }
   });
 
@@ -103,11 +108,15 @@ export default function Orders() {
     }
   };
 
-  // Update order
+  // Update order with improved validation
   const updateOrder = useMutation({
     mutationFn: async (data: { id: string; formData: OrderFormData }) => {
       const { id, formData } = data;
-      console.log('Updating order with data:', formData);
+
+      // Validate products array is not empty
+      if (!formData.products || formData.products.length === 0) {
+        throw new Error('Order must have at least one product');
+      }
 
       // Format products data before saving
       const formattedProducts = formData.products.map(product => ({
@@ -140,8 +149,6 @@ export default function Orders() {
         products: formattedProducts,
         updatedAt: new Date().toISOString()
       };
-
-      console.log('Formatted update data:', updateData);
 
       try {
         await updateDoc(doc(db, "shopify_orders", id), updateData);
