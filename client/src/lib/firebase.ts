@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, browserLocalPersistence, setPersistence } from "firebase/auth";
 import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, setDoc, getDoc } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -41,6 +41,15 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
+// Set persistence to LOCAL
+setPersistence(auth, browserLocalPersistence)
+  .then(() => {
+    console.log('Firebase persistence set to LOCAL');
+  })
+  .catch((error) => {
+    console.error('Error setting persistence:', error);
+  });
+
 // Hàm test kết nối Firestore
 export const testFirestoreConnection = async () => {
   try {
@@ -57,22 +66,37 @@ export const testFirestoreConnection = async () => {
   }
 };
 
-// Authentication functions with improved error handling and session persistence
+// Authentication functions with improved error handling
 export const login = async (email: string, password: string) => {
   try {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    // Enable session persistence
-    await auth.setPersistence('SESSION');
-    return result;
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+
+    if (!userDoc.exists()) {
+      throw new Error('Không tìm thấy thông tin người dùng');
+    }
+
+    return userCredential;
   } catch (error: any) {
     console.error('Login error:', error);
-    if (error.code === 'auth/network-request-failed') {
-      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+    switch (error.code) {
+      case 'auth/invalid-email':
+        throw new Error('Email không hợp lệ');
+      case 'auth/user-disabled':
+        throw new Error('Tài khoản đã bị vô hiệu hóa');
+      case 'auth/user-not-found':
+        throw new Error('Không tìm thấy tài khoản với email này');
+      case 'auth/wrong-password':
+        throw new Error('Mật khẩu không đúng');
+      case 'auth/invalid-credential':
+        throw new Error('Email hoặc mật khẩu không đúng');
+      case 'auth/network-request-failed':
+        throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
+      case 'auth/too-many-requests':
+        throw new Error('Quá nhiều lần thử đăng nhập không thành công. Vui lòng thử lại sau');
+      default:
+        throw new Error('Lỗi đăng nhập: ' + error.message);
     }
-    if (error.code === 'auth/invalid-credential') {
-      throw new Error('Email hoặc mật khẩu không đúng.');
-    }
-    throw error;
   }
 };
 
@@ -91,9 +115,6 @@ export const register = async (email: string, password: string, role: string, na
     return userCredential;
   } catch (error: any) {
     console.error('Registration error:', error);
-    if (error.code === 'auth/network-request-failed') {
-      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
-    }
     if (error.code === 'auth/email-already-in-use') {
       throw new Error('Email này đã được sử dụng.');
     }
@@ -147,7 +168,7 @@ export const createAdminAccount = async () => {
     return adminCredential;
   } catch (error: any) {
     console.error('Error creating admin account:', error);
-    throw error; // Throw error để biết được nếu có lỗi
+    throw error;
   }
 };
 
@@ -160,9 +181,6 @@ export const logout = async () => {
     return true;
   } catch (error: any) {
     console.error('Logout error:', error);
-    if (error.code === 'auth/network-request-failed') {
-      throw new Error('Lỗi kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.');
-    }
     throw error;
   }
 };
