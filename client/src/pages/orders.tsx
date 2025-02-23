@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Download, Eye, PencilIcon, RefreshCw } from "lucide-react";
+import { Download, Eye, PencilIcon, RefreshCw, Plus, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { useToast } from "@/hooks/use-toast";
@@ -25,10 +25,11 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { storage } from "@/lib/firebase"; 
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import type { ShopifyOrder } from "@/lib/types";
+import type { ShopifyOrder, EmbroideryPosition } from "@/lib/types";
 import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
 
 type OrderFormData = {
   customer: {
@@ -42,11 +43,7 @@ type OrderFormData = {
     quantity: number;
     color?: string;
     size?: string;
-    embroideryPositions?: {
-      name: string;
-      description: string;
-      designUrl?: string;
-    }[];
+    embroideryPositions: EmbroideryPosition[];
   }[];
 };
 
@@ -139,7 +136,10 @@ export default function Orders() {
     if (order) {
       form.reset({
         customer: order.customer,
-        products: order.products
+        products: order.products.map(product => ({
+          ...product,
+          embroideryPositions: product.embroideryPositions || []
+        }))
       });
     }
   };
@@ -179,6 +179,27 @@ export default function Orders() {
     }
   };
 
+  // Add new embroidery position
+  const handleAddPosition = (productIndex: number) => {
+    const products = form.getValues('products');
+    if (!products[productIndex].embroideryPositions) {
+      products[productIndex].embroideryPositions = [];
+    }
+    products[productIndex].embroideryPositions.push({
+      name: '',
+      description: '',
+      designUrl: ''
+    });
+    form.setValue('products', products);
+  };
+
+  // Remove embroidery position
+  const handleRemovePosition = (productIndex: number, positionIndex: number) => {
+    const products = form.getValues('products');
+    products[productIndex].embroideryPositions.splice(positionIndex, 1);
+    form.setValue('products', products);
+  };
+
   if (isLoading) {
     return <div>Đang tải...</div>;
   }
@@ -203,12 +224,12 @@ export default function Orders() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="whitespace-nowrap">Mã đơn</TableHead>
-              <TableHead className="whitespace-nowrap">Khách hàng</TableHead>
-              <TableHead className="whitespace-nowrap">Sản phẩm</TableHead>
-              <TableHead className="whitespace-nowrap">Trạng thái</TableHead>
-              <TableHead className="whitespace-nowrap">Tiến độ</TableHead>
-              <TableHead className="whitespace-nowrap">Ngày tạo</TableHead>
+              <TableHead>Mã đơn</TableHead>
+              <TableHead>Khách hàng</TableHead>
+              <TableHead>Sản phẩm</TableHead>
+              <TableHead>Trạng thái</TableHead>
+              <TableHead>Tiến độ</TableHead>
+              <TableHead>Ngày tạo</TableHead>
               <TableHead className="w-[100px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -438,9 +459,31 @@ export default function Orders() {
                           </div>
 
                           <div className="space-y-2">
-                            <h4 className="font-medium">Vị trí thêu</h4>
+                            <div className="flex justify-between items-center">
+                              <h4 className="font-medium">Vị trí thêu</h4>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAddPosition(productIndex)}
+                              >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Thêm vị trí
+                              </Button>
+                            </div>
                             {product.embroideryPositions?.map((pos, posIndex) => (
-                              <div key={posIndex} className="border-t pt-2 space-y-2">
+                              <div key={posIndex} className="border rounded-lg p-4 space-y-4">
+                                <div className="flex justify-between items-center">
+                                  <h5 className="font-medium">Vị trí {posIndex + 1}</h5>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemovePosition(productIndex, posIndex)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                                 <FormField
                                   control={form.control}
                                   name={`products.${productIndex}.embroideryPositions.${posIndex}.name`}
@@ -458,9 +501,12 @@ export default function Orders() {
                                   name={`products.${productIndex}.embroideryPositions.${posIndex}.description`}
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Mô tả</FormLabel>
+                                      <FormLabel>Mô tả chi tiết</FormLabel>
                                       <FormControl>
-                                        <Input {...field} />
+                                        <Textarea 
+                                          {...field}
+                                          placeholder="Nhập mô tả chi tiết về vị trí thêu (kích thước, yêu cầu đặc biệt,...)"
+                                        />
                                       </FormControl>
                                     </FormItem>
                                   )}
@@ -530,16 +576,21 @@ export default function Orders() {
                           {product.embroideryPositions && product.embroideryPositions.length > 0 && (
                             <div className="mt-2">
                               <div className="text-sm font-medium">Vị trí thêu:</div>
-                              <ul className="list-disc list-inside text-sm">
+                              <ul className="space-y-2 mt-1">
                                 {product.embroideryPositions.map((pos, idx) => (
-                                  <li key={idx} className="flex items-center gap-2">
-                                    <span>{pos.name}</span>
+                                  <li key={idx} className="border-l-2 border-gray-200 pl-3">
+                                    <div className="font-medium">{pos.name}</div>
+                                    {pos.description && (
+                                      <div className="text-sm text-gray-600 mt-1">
+                                        {pos.description}
+                                      </div>
+                                    )}
                                     {pos.designUrl && (
                                       <a
                                         href={pos.designUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-sm text-blue-600 hover:underline"
+                                        className="text-sm text-blue-600 hover:underline block mt-1"
                                       >
                                         Xem design
                                       </a>
