@@ -6,7 +6,7 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   uid: text("uid").notNull().unique(),
   email: text("email").notNull(),
-  role: text("role").notNull(),
+  role: text("role", { enum: ['admin', 'worker', 'manager', 'machine_manager'] }).notNull(),
   name: text("name").notNull(),
 });
 

@@ -141,8 +141,13 @@ function Router() {
         </PrivateRoute>
       </Route>
       <Route path="/machine-group">
-        <PrivateRoute requiredRole="manager">
+        <PrivateRoute requiredRole={["manager", "machine_manager"]}>
           <MachineGroupView />
+        </PrivateRoute>
+      </Route>
+      <Route path="/machine-monitor">
+        <PrivateRoute requiredRole={["machine_manager", "admin"]}>
+          <MachineMonitor />
         </PrivateRoute>
       </Route>
       <Route path="/settings">
