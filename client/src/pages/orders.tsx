@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Download, Eye, PencilIcon } from "lucide-react";
+import { Download, Eye, PencilIcon, RefreshCw } from "lucide-react";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
 import { useToast } from "@/hooks/use-toast";
