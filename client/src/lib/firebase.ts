@@ -57,10 +57,13 @@ export const testFirestoreConnection = async () => {
   }
 };
 
-// Authentication functions with improved error handling
+// Authentication functions with improved error handling and session persistence
 export const login = async (email: string, password: string) => {
   try {
-    return await signInWithEmailAndPassword(auth, email, password);
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    // Enable session persistence
+    await auth.setPersistence('SESSION');
+    return result;
   } catch (error: any) {
     console.error('Login error:', error);
     if (error.code === 'auth/network-request-failed') {
@@ -100,6 +103,8 @@ export const register = async (email: string, password: string, role: string, na
 
 export const createAdminAccount = async () => {
   try {
+    console.log('Checking for existing admin account...');
+
     // Kiểm tra xem tài khoản admin đã tồn tại chưa
     const usersRef = collection(db, "users");
     const snapshot = await getDocs(usersRef);
@@ -142,14 +147,17 @@ export const createAdminAccount = async () => {
     return adminCredential;
   } catch (error: any) {
     console.error('Error creating admin account:', error);
-    // Không throw error ở đây để tránh block luồng khởi tạo app
-    return null;
+    throw error; // Throw error để biết được nếu có lỗi
   }
 };
 
 export const logout = async () => {
   try {
-    return await signOut(auth);
+    await signOut(auth);
+    // Clear any local session data
+    localStorage.clear();
+    sessionStorage.clear();
+    return true;
   } catch (error: any) {
     console.error('Logout error:', error);
     if (error.code === 'auth/network-request-failed') {
