@@ -102,7 +102,7 @@ function Router() {
         </PrivateRoute>
       </Route>
       <Route path="/dashboard">
-        <PrivateRoute>
+        <PrivateRoute requiredRole="admin">
           <Dashboard />
         </PrivateRoute>
       </Route>
@@ -147,7 +147,7 @@ function Router() {
         </PrivateRoute>
       </Route>
       <Route path="/machine-monitor">
-        <PrivateRoute requiredRole={["machine_manager", "admin"]}>
+        <PrivateRoute requiredRole={["machine_monitor", "admin"]}>
           <MachineMonitor />
         </PrivateRoute>
       </Route>

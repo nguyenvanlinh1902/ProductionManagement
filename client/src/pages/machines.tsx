@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Settings, Play, Pause, AlertTriangle, Clock, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import {
   collection,
   getDocs,
@@ -38,6 +38,7 @@ import {
   updateDoc,
   doc,
   where,
+  getDoc,
 } from "firebase/firestore";
 import type { SewingMachine, MachineRecommendation } from "@/lib/types";
 import { THREAD_COLORS, MACHINE_STATUSES } from "@/lib/constants";
@@ -64,6 +65,23 @@ export default function Machines() {
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+  const [machines, setMachines] = useState<SewingMachine[]>([]);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserRole(docSnap.data().role);
+          setUserId(user.uid);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Fetch managers list
   const { data: managers = [] } = useQuery({
@@ -80,23 +98,33 @@ export default function Machines() {
   });
 
   // Fetch machines list
-  const { data: machines = [], isLoading, refetch } = useQuery<SewingMachine[]>({
+  const {  isLoading, refetch } = useQuery<SewingMachine[]>({
     queryKey: ['/api/machines'],
     queryFn: async () => {
       try {
         const machinesRef = collection(db, "sewing_machines");
         const q = query(machinesRef, orderBy("name"));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({
+        const fetchedMachines = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as SewingMachine[];
+        setMachines(fetchedMachines);
+        return fetchedMachines;
       } catch (error) {
         console.error('Error fetching machines:', error);
         throw new Error('Failed to fetch machines');
       }
     }
   });
+
+  // Filter machines based on role
+  const filteredMachines = useMemo(() => {
+    if (userRole === 'admin') return machines;
+    if (userRole === 'machine_manager') return machines.filter(machine => machine.managerId === userId);
+    return [];
+  }, [machines, userRole, userId]);
+
 
   // Add/Update machine
   const mutateAction = useMutation({
@@ -142,15 +170,17 @@ export default function Machines() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold">Quản lý máy khâu</h1>
-        <Button 
-          onClick={() => {
-            setSelectedMachine(null);
-            setIsUpdateDialogOpen(true);
-          }}
-          className="w-full sm:w-auto"
-        >
-          Thêm máy mới
-        </Button>
+        {userRole === 'admin' && (
+          <Button 
+            onClick={() => {
+              setSelectedMachine(null);
+              setIsUpdateDialogOpen(true);
+            }}
+            className="w-full sm:w-auto"
+          >
+            Thêm máy mới
+          </Button>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -180,7 +210,7 @@ export default function Machines() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {machines.map((machine) => (
+                  {filteredMachines.map((machine) => (
                     <TableRow key={machine.id} className={cn(
                       machine.status === 'working' && "animate-pulse bg-green-50/50"
                     )}>
@@ -246,16 +276,18 @@ export default function Machines() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedMachine(machine);
-                            setIsUpdateDialogOpen(true);
-                          }}
-                        >
-                          <Settings className="h-4 w-4" />
-                        </Button>
+                        {userRole === 'machine_manager' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedMachine(machine);
+                              setIsUpdateDialogOpen(true);
+                            }}
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -272,7 +304,7 @@ export default function Machines() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {machines.map(machine => {
+                {filteredMachines.map(machine => {
                   const recs = getRecommendationsForMachine(machine.id);
                   return (
                     <Card key={machine.id}>
@@ -295,19 +327,12 @@ export default function Machines() {
                                 )}
                               </div>
                               <div>
-                                <h4 className="font-medium">{rec.reason}</h4>
+                                <h4 className="font-medium">{rec.title}</h4> {/* Corrected to use 'title' */}
                                 <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                                   <div className="flex items-center gap-1">
-                                    <Clock className="w-4 h-4" />
-                                    {rec.estimatedTime} phút
+                                    {/* Removed estimatedTime as it's not in the data */}
                                   </div>
-                                  <div className="flex items-center gap-1">
-                                    <div 
-                                      className="w-4 h-4 rounded-full" 
-                                      style={{ backgroundColor: rec.threadColor }}
-                                    />
-                                    {THREAD_COLORS.find(c => c.hex === rec.threadColor)?.name || rec.threadColor}
-                                  </div>
+                                  {/* Removed threadColor as it's not in the data */}
                                 </div>
                               </div>
                             </div>
@@ -329,7 +354,7 @@ export default function Machines() {
             </CardHeader>
             <CardContent>
               <div className="space-y-8">
-                {machines.map(machine => (
+                {filteredMachines.map(machine => (
                   <div key={machine.id} className="space-y-4">
                     <h3 className="font-medium">{machine.name}</h3>
                     <div className="relative">
@@ -383,6 +408,7 @@ export default function Machines() {
                 currentProductName: formData.get('productName') as string,
                 startTime: formData.get('startTime') as string,
                 estimatedEndTime: formData.get('estimatedEndTime') as string,
+                assignedTo: userId
               });
             }}
             className="space-y-4"
