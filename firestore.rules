@@ -1,0 +1,40 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Kiểm tra user đã đăng nhập
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Kiểm tra user có role agent
+    function isAgent() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'agent';
+    }
+
+    // Rules cho collection users
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rules cho collection orders 
+    match /orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow write: if isAgent();
+    }
+
+    // Rules cho collection products
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      allow write: if isAgent();
+    }
+
+    // Rules cho collection productionStages
+    match /productionStages/{stageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAgent();
+    }
+  }
+}
