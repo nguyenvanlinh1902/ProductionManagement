@@ -9,26 +9,52 @@ export const userSchema = z.object({
   createdAt: z.string()
 });
 
+export const printingTechniqueSchema = z.enum(['DTF_PRINTING', 'DTG_PRINTING']);
+
+export const printingLocationSchema = z.enum([
+  'LEFT_CHEST',
+  'CENTERED',
+  'LARGE_CENTER',
+  'LEFT_SLEEVE',
+  'RIGHT_SLEEVE',
+  'BACK_LOCATION',
+  'SPECIAL_LOCATION'
+]);
+
+export const printingDetailsSchema = z.object({
+  technique: printingTechniqueSchema,
+  mainLocation: printingLocationSchema,
+  additionalLocations: z.array(printingLocationSchema).optional(),
+  designUrl: z.string().optional(),
+  mockupUrl: z.string().optional(),
+  hasPrintingFile: z.boolean().default(false),
+});
+
 export const productSchema = z.object({
   id: z.string(),
   name: z.string(),
   sku: z.string(),
-  barcode: z.string(),
+  price: z.number(),
+  color: z.string(),
+  size: z.string(),
+  printingDetails: printingDetailsSchema,
   quantity: z.number()
-});
-
-export const insertProductSchema = productSchema.omit({
-  id: true
 });
 
 export const orderSchema = z.object({
   id: z.string(),
   orderNumber: z.string(),
   customer: z.string(),
-  products: z.array(z.any()),
+  products: z.array(productSchema),
+  salesChannel: z.string(),
   status: z.string(),
   qrCode: z.string().optional(),
+  designUrls: z.array(z.string()),
   createdAt: z.string()
+});
+
+export const insertProductSchema = productSchema.omit({
+  id: true
 });
 
 export const insertOrderSchema = orderSchema.omit({ 
@@ -51,3 +77,6 @@ export type User = z.infer<typeof userSchema>;
 export type Order = z.infer<typeof orderSchema>;
 export type Product = z.infer<typeof productSchema>;
 export type ProductionStage = z.infer<typeof productionStageSchema>;
+export type PrintingTechnique = z.infer<typeof printingTechniqueSchema>;
+export type PrintingLocation = z.infer<typeof printingLocationSchema>;
+export type PrintingDetails = z.infer<typeof printingDetailsSchema>;

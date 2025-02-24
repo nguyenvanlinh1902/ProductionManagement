@@ -37,6 +37,8 @@ VITE_FIREBASE_APP_ID=xxx
 
 ### Firebase Collections
 
+
+https://ecoprint.top/
 #### Users Collection
 ```typescript
 interface User {
