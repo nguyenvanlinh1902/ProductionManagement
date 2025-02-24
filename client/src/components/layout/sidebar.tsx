@@ -23,7 +23,7 @@ const menuItems: MenuItem[] = [
   { label: "Người dùng", path: "/users", icon: "👥", requiredRole: "admin" },
   { label: "Quản lý máy", path: "/machines", icon: "⚙️", requiredRole: ["admin", "machine_manager"] },
   { label: "Nhóm máy", path: "/machine-group", icon: "🔧", requiredRole: ["manager", "machine_manager"] },
-  { label: "Theo dõi máy", path: "/machine-monitor", icon: "📊", requiredRole: ["machine_manager", "admin"] },
+  { label: "Theo dõi máy", path: "/machine-monitor", icon: "📊", requiredRole: ["machine_manager", "admin"] }, // Added Machine Monitoring item
   { label: "Shopify", path: "/shopify", icon: "🔄", requiredRole: "admin" },
   { label: "Cài đặt", path: "/settings", icon: "⚙️", requiredRole: "admin" }
 ];
