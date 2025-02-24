@@ -1,8 +1,18 @@
+
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useForm } from "react-hook-form";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -12,18 +22,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
-import { db } from "@/lib/firebase";
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useForm } from "react-hook-form";
-import { Form, FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
+import { db } from "@/lib/firebase";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface Stage {
   id: string;
@@ -38,6 +46,7 @@ type StageFormData = {
 
 export default function Settings() {
   const [isOpen, setIsOpen] = useState(false);
+  const [editingStage, setEditingStage] = useState<Stage | null>(null);
   const { toast } = useToast();
   const form = useForm<StageFormData>();
 
@@ -65,6 +74,7 @@ export default function Settings() {
         description: "Đã cập nhật công đoạn sản xuất"
       });
       setIsOpen(false);
+      setEditingStage(null);
       form.reset();
       refetch();
     }
@@ -72,12 +82,42 @@ export default function Settings() {
 
   const onSubmit = async (data: StageFormData) => {
     const newStages = [...stages];
-    newStages.push({
-      id: data.id,
-      name: data.name,
-      order: newStages.length + 1
-    });
+    if (editingStage) {
+      // Edit existing stage
+      const index = newStages.findIndex(s => s.id === editingStage.id);
+      if (index !== -1) {
+        newStages[index] = {
+          ...newStages[index],
+          id: data.id,
+          name: data.name
+        };
+      }
+    } else {
+      // Add new stage
+      newStages.push({
+        id: data.id,
+        name: data.name,
+        order: newStages.length + 1
+      });
+    }
     updateStages.mutate(newStages);
+  };
+
+  const handleEdit = (stage: Stage) => {
+    setEditingStage(stage);
+    form.reset({
+      id: stage.id,
+      name: stage.name
+    });
+    setIsOpen(true);
+  };
+
+  const handleDelete = (stageId: string) => {
+    if (confirm("Bạn có chắc chắn muốn xóa công đoạn này?")) {
+      const newStages = stages.filter(s => s.id !== stageId)
+        .map((s, index) => ({ ...s, order: index + 1 }));
+      updateStages.mutate(newStages);
+    }
   };
 
   if (isLoading) {
@@ -86,23 +126,23 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Cài đặt</h1>
-      </div>
-
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Công đoạn sản xuất</CardTitle>
+          <CardTitle>Quản lý công đoạn sản xuất</CardTitle>
           <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button onClick={() => {
+                setEditingStage(null);
+                form.reset({ id: "", name: "" });
+              }}>
                 Thêm công đoạn
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Thêm công đoạn sản xuất</DialogTitle>
+                <DialogTitle>
+                  {editingStage ? "Sửa công đoạn" : "Thêm công đoạn mới"}
+                </DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -113,8 +153,9 @@ export default function Settings() {
                       <FormItem>
                         <FormLabel>Mã công đoạn</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Ví dụ: cutting" />
+                          <Input placeholder="VD: CUTTING" {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -125,12 +166,15 @@ export default function Settings() {
                       <FormItem>
                         <FormLabel>Tên công đoạn</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Ví dụ: Cắt" />
+                          <Input placeholder="VD: Cắt vải" {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full">Thêm công đoạn</Button>
+                  <Button type="submit" className="w-full">
+                    {editingStage ? "Cập nhật" : "Thêm công đoạn"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
@@ -143,6 +187,7 @@ export default function Settings() {
                 <TableHead>Mã công đoạn</TableHead>
                 <TableHead>Tên công đoạn</TableHead>
                 <TableHead>Thứ tự</TableHead>
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,6 +196,24 @@ export default function Settings() {
                   <TableCell>{stage.id}</TableCell>
                   <TableCell>{stage.name}</TableCell>
                   <TableCell>{stage.order}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(stage)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(stage.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
