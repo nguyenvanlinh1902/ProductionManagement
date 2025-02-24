@@ -9,6 +9,18 @@ export const userSchema = z.object({
   createdAt: z.string()
 });
 
+export const productSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  sku: z.string(),
+  barcode: z.string(),
+  quantity: z.number()
+});
+
+export const insertProductSchema = productSchema.omit({
+  id: true
+});
+
 export const orderSchema = z.object({
   id: z.string(),
   orderNumber: z.string(),
@@ -23,18 +35,6 @@ export const insertOrderSchema = orderSchema.omit({
   id: true,
   qrCode: true,
   createdAt: true 
-});
-
-export const insertProductSchema = productSchema.omit({
-  id: true
-});
-
-export const productSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  sku: z.string(),
-  barcode: z.string(),
-  quantity: z.number()
 });
 
 export const productionStageSchema = z.object({
