@@ -1,6 +1,6 @@
 
 import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firebase.js';
 import type { User, Order, Product, ProductionStage } from '@shared/schema';
 
 export interface IStorage {
