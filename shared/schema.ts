@@ -19,6 +19,16 @@ export const orderSchema = z.object({
   createdAt: z.string()
 });
 
+export const insertOrderSchema = orderSchema.omit({ 
+  id: true,
+  qrCode: true,
+  createdAt: true 
+});
+
+export const insertProductSchema = productSchema.omit({
+  id: true
+});
+
 export const productSchema = z.object({
   id: z.string(),
   name: z.string(),
