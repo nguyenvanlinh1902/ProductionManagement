@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Validation schemas
+// User schema
 export const userSchema = z.object({
   uid: z.string(),
   email: z.string().email(),
@@ -9,7 +9,10 @@ export const userSchema = z.object({
   createdAt: z.string()
 });
 
-// Product Types and Techniques
+// Machine types
+export const machineTypeSchema = z.enum(['DTF_PRINTING', 'DTG_PRINTING']);
+
+// Production Types
 export const productTypeSchema = z.enum(['EMBROIDERY', 'DTF_PRINTING', 'DTG_PRINTING']);
 
 // Locations schema based on product type
@@ -33,6 +36,22 @@ export const printingLocationSchema = z.enum([
   'SPECIAL_LOCATION'
 ]);
 
+// Production steps
+export const embroideryStepSchema = z.enum([
+  'PREPARATION',
+  'EMBROIDERY_OUTLINE',
+  'EMBROIDERY_FILL',
+  'EMBROIDERY_DETAILS',
+  'QUALITY_CHECK'
+]);
+
+export const printingStepSchema = z.enum([
+  'FILE_PREPARATION',
+  'PRINTING',
+  'HEAT_PRESS',
+  'QUALITY_CHECK'
+]);
+
 // Production details based on type
 export const embroideryDetailsSchema = z.object({
   type: z.literal('EMBROIDERY'),
@@ -41,6 +60,9 @@ export const embroideryDetailsSchema = z.object({
   designUrl: z.string().optional(),
   mockupUrl: z.string().optional(),
   hasEmbroideryFile: z.boolean().default(false),
+  currentStep: embroideryStepSchema.optional(),
+  assignedWorker: z.string().optional(),
+  completedSteps: z.array(embroideryStepSchema).default([])
 });
 
 export const printingDetailsSchema = z.object({
@@ -50,6 +72,9 @@ export const printingDetailsSchema = z.object({
   designUrl: z.string().optional(),
   mockupUrl: z.string().optional(),
   hasPrintingFile: z.boolean().default(false),
+  currentStep: printingStepSchema.optional(),
+  assignedMachine: z.string().optional(),
+  completedSteps: z.array(printingStepSchema).default([])
 });
 
 // Combined production details
@@ -57,6 +82,20 @@ export const productionDetailsSchema = z.discriminatedUnion('type', [
   embroideryDetailsSchema,
   printingDetailsSchema
 ]);
+
+// Machine schema
+export const machineSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: machineTypeSchema,
+  status: z.enum(['idle', 'working', 'maintenance']),
+  currentProductId: z.string().optional(),
+  currentProductName: z.string().optional(),
+  managerId: z.string(),
+  managerName: z.string(),
+  startTime: z.string().optional(),
+  estimatedEndTime: z.string().optional()
+});
 
 export const productSchema = z.object({
   id: z.string(),
@@ -66,7 +105,8 @@ export const productSchema = z.object({
   color: z.string(),
   size: z.string(),
   productionDetails: productionDetailsSchema,
-  quantity: z.number()
+  quantity: z.number(),
+  status: z.enum(['pending', 'in_production', 'completed']).default('pending')
 });
 
 export const orderSchema = z.object({
@@ -75,29 +115,38 @@ export const orderSchema = z.object({
   customer: z.string(),
   products: z.array(productSchema),
   salesChannel: z.string(),
-  status: z.string(),
+  status: z.enum(['pending', 'in_production', 'completed']),
   qrCode: z.string().optional(),
   designUrls: z.array(z.string()),
-  createdAt: z.string()
+  priority: z.number().default(0),
+  createdAt: z.string(),
+  estimatedCompletionTime: z.string().optional()
 });
 
 export const insertProductSchema = productSchema.omit({
-  id: true
+  id: true,
+  status: true
 });
 
 export const insertOrderSchema = orderSchema.omit({ 
   id: true,
   qrCode: true,
-  createdAt: true 
+  createdAt: true,
+  status: true,
+  priority: true
 });
 
 export const productionStageSchema = z.object({
   id: z.string(),
-  orderId: z.string(),
-  stage: z.string(),
-  status: z.string(),
+  productId: z.string(),
+  type: productTypeSchema,
+  step: z.union([embroideryStepSchema, printingStepSchema]),
+  status: z.enum(['pending', 'in_progress', 'completed']),
+  assignedTo: z.string(),
+  assignedName: z.string(),
+  startTime: z.string().optional(),
   completedAt: z.string().optional(),
-  completedBy: z.string().optional()
+  notes: z.string().optional()
 });
 
 // Types
@@ -106,6 +155,8 @@ export type Order = z.infer<typeof orderSchema>;
 export type Product = z.infer<typeof productSchema>;
 export type ProductionStage = z.infer<typeof productionStageSchema>;
 export type ProductType = z.infer<typeof productTypeSchema>;
+export type MachineType = z.infer<typeof machineTypeSchema>;
 export type EmbroideryLocation = z.infer<typeof embroideryLocationSchema>;
 export type PrintingLocation = z.infer<typeof printingLocationSchema>;
 export type ProductionDetails = z.infer<typeof productionDetailsSchema>;
+export type Machine = z.infer<typeof machineSchema>;
