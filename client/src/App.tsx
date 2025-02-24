@@ -115,11 +115,6 @@ function Router() {
           <Production />
         </PrivateRoute>
       </Route>
-      <Route path="/scan">
-        <PrivateRoute requiredRole="worker">
-          <Scan />
-        </PrivateRoute>
-      </Route>
       <Route path="/warehouse">
         <PrivateRoute requiredRole="admin">
           <Warehouse />
@@ -140,7 +135,7 @@ function Router() {
           <Machines />
         </PrivateRoute>
       </Route>
-      
+
       <Route path="/machine-monitor">
         <PrivateRoute requiredRole={["machine_monitor", "admin"]}>
           <MachineMonitor />
