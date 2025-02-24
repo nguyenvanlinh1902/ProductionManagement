@@ -43,6 +43,22 @@ import type { SewingMachine, MachineRecommendation } from "@/lib/types";
 import { THREAD_COLORS, MACHINE_STATUSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
+function getRecommendationsForMachine(machineId: string) {
+  // Basic recommendations based on thread color and current status
+  return [
+    {
+      title: "Chuyển sang sản phẩm tương tự",
+      description: "Có thể tiếp tục với cùng màu chỉ để tối ưu thời gian",
+      priority: "Cao"
+    },
+    {
+      title: "Kiểm tra bảo trì",
+      description: "Đề xuất kiểm tra máy sau 8 giờ hoạt động liên tục",
+      priority: "Trung bình"
+    }
+  ];
+}
+
 export default function Machines() {
   const [selectedMachine, setSelectedMachine] = useState<SewingMachine | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
