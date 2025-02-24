@@ -18,7 +18,6 @@ const menuItems: MenuItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: "📊", requiredRole: "admin" },
   { label: "Đơn hàng", path: "/orders", icon: "📦", requiredRole: "admin" },
   { label: "Sản xuất", path: "/production", icon: "🏭" },
-  { label: "Quét mã QR", path: "/scan", icon: "📱", requiredRole: "worker" },
   { label: "Kho hàng", path: "/warehouse", icon: "🏪", requiredRole: "admin" },
   { label: "Người dùng", path: "/users", icon: "👥", requiredRole: "admin" },
   { label: "Quản lý máy", path: "/machines", icon: "⚙️", requiredRole: ["admin", "machine_manager"] },

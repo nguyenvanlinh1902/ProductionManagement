@@ -16,7 +16,6 @@ import Warehouse from "@/pages/warehouse";
 import NotFound from "@/pages/not-found";
 import Settings from "@/pages/settings";
 import Users from "@/pages/users";
-import Scan from "@/pages/scan";
 import Shopify from "@/pages/shopify";
 import Machines from "@/pages/machines"; 
 import MachineGroupView from "@/pages/machine-group";
