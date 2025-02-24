@@ -19,6 +19,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Settings, Play, Pause, AlertTriangle, Clock, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -30,15 +37,31 @@ import {
   addDoc,
   updateDoc,
   doc,
+  where,
 } from "firebase/firestore";
 import type { SewingMachine, MachineRecommendation } from "@/lib/types";
 import { THREAD_COLORS, MACHINE_STATUSES } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 export default function Machines() {
   const [selectedMachine, setSelectedMachine] = useState<SewingMachine | null>(null);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const { toast } = useToast();
+
+  // Fetch managers list
+  const { data: managers = [] } = useQuery({
+    queryKey: ['/api/users/managers'],
+    queryFn: async () => {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("role", "==", "machine_manager"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    }
+  });
 
   // Fetch machines list
   const { data: machines = [], isLoading, refetch } = useQuery<SewingMachine[]>({
@@ -55,24 +78,6 @@ export default function Machines() {
       } catch (error) {
         console.error('Error fetching machines:', error);
         throw new Error('Failed to fetch machines');
-      }
-    }
-  });
-
-  // Fetch recommendations
-  const { data: recommendations = [] } = useQuery<MachineRecommendation[]>({
-    queryKey: ['/api/machines/recommendations'],
-    queryFn: async () => {
-      try {
-        const recsRef = collection(db, "machine_recommendations");
-        const snapshot = await getDocs(recsRef);
-        return snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as MachineRecommendation[];
-      } catch (error) {
-        console.error('Error fetching recommendations:', error);
-        return [];
       }
     }
   });
@@ -113,30 +118,27 @@ export default function Machines() {
     }
   });
 
-  // Get recommendations for a machine
-  const getRecommendationsForMachine = (machineId: string) => {
-    return recommendations.filter(rec => rec.machineId === machineId)
-      .sort((a, b) => b.priority - a.priority);
-  };
-
   if (isLoading) {
     return <div>Đang tải...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Quản lý máy khâu</h1>
-        <Button onClick={() => {
-          setSelectedMachine(null);
-          setIsUpdateDialogOpen(true);
-        }}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">Quản lý máy khâu</h1>
+        <Button 
+          onClick={() => {
+            setSelectedMachine(null);
+            setIsUpdateDialogOpen(true);
+          }}
+          className="w-full sm:w-auto"
+        >
           Thêm máy mới
         </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+        <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="recommendations">Gợi ý & Hướng dẫn</TabsTrigger>
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
@@ -147,7 +149,7 @@ export default function Machines() {
             <CardHeader>
               <CardTitle>Danh sách máy</CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -162,79 +164,85 @@ export default function Machines() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {machines.map((machine) => {
-                    const recommendations = getRecommendationsForMachine(machine.id);
-                    const nextRec = recommendations[0];
-
-                    return (
-                      <TableRow key={machine.id}>
-                        <TableCell className="font-medium">{machine.name}</TableCell>
-                        <TableCell>{machine.managerName}</TableCell>
-                        <TableCell>
+                  {machines.map((machine) => (
+                    <TableRow key={machine.id} className={cn(
+                      machine.status === 'working' && "animate-pulse bg-green-50/50"
+                    )}>
+                      <TableCell className="font-medium">{machine.name}</TableCell>
+                      <TableCell>{machine.managerName}</TableCell>
+                      <TableCell>
+                        <div className={cn(
+                          "flex items-center gap-2 px-3 py-1 rounded-full w-fit",
+                          machine.status === 'working' && "bg-green-100 text-green-800",
+                          machine.status === 'idle' && "bg-yellow-100 text-yellow-800",
+                          machine.status === 'maintenance' && "bg-red-100 text-red-800"
+                        )}>
+                          {machine.status === 'working' ? (
+                            <Play className="w-4 h-4" />
+                          ) : machine.status === 'idle' ? (
+                            <Pause className="w-4 h-4" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4" />
+                          )}
+                          <span>
+                            {machine.status === 'working' ? 'Đang hoạt động' :
+                             machine.status === 'idle' ? 'Đang rảnh' : 'Bảo trì'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {machine.currentThreadColor && (
                           <div className="flex items-center gap-2">
-                            {machine.status === 'working' ? (
-                              <Play className="w-4 h-4 text-green-500" />
-                            ) : machine.status === 'idle' ? (
-                              <Pause className="w-4 h-4 text-yellow-500" />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-red-500" />
-                            )}
-                            <span>
-                              {machine.status === 'working' ? 'Đang hoạt động' :
-                               machine.status === 'idle' ? 'Đang rảnh' : 'Bảo trì'}
-                            </span>
+                            <div 
+                              className="w-4 h-4 rounded-full border" 
+                              style={{ backgroundColor: machine.currentThreadColor }}
+                            />
+                            {THREAD_COLORS.find(c => c.hex === machine.currentThreadColor)?.name || 
+                             machine.currentThreadColor}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          {machine.currentThreadColor && (
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-4 h-4 rounded-full" 
-                                style={{ backgroundColor: machine.currentThreadColor }}
-                              />
-                              {THREAD_COLORS.find(c => c.hex === machine.currentThreadColor)?.name || 
-                               machine.currentThreadColor}
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {machine.currentProductName || 'Không có'}
+                      </TableCell>
+                      <TableCell>
+                        {machine.status === 'working' && machine.startTime && (
+                          <div className="text-sm space-y-1">
+                            <div className="flex items-center gap-1 text-gray-600">
+                              <Clock className="w-4 h-4" />
+                              Bắt đầu: {new Date(machine.startTime).toLocaleTimeString()}
                             </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {machine.currentProductName || 'Không có'}
-                        </TableCell>
-                        <TableCell>
-                          {machine.status === 'working' && machine.startTime && (
-                            <div className="text-sm">
-                              <div>Bắt đầu: {new Date(machine.startTime).toLocaleTimeString()}</div>
-                              {machine.estimatedEndTime && (
-                                <div>Dự kiến xong: {new Date(machine.estimatedEndTime).toLocaleTimeString()}</div>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {nextRec && (
-                            <div className="text-sm">
-                              <div className="font-medium">{nextRec.reason}</div>
-                              <div className="text-muted-foreground">
-                                Thời gian ước tính: {nextRec.estimatedTime} phút
+                            {machine.estimatedEndTime && (
+                              <div className="flex items-center gap-1 text-gray-600">
+                                <ArrowRight className="w-4 h-4" />
+                                Dự kiến: {new Date(machine.estimatedEndTime).toLocaleTimeString()}
                               </div>
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedMachine(machine);
-                              setIsUpdateDialogOpen(true);
-                            }}
-                          >
-                            <Settings className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div className="font-medium">SP001 - Áo thun</div>
+                          <div className="text-muted-foreground">
+                            Thời gian ước tính: 30 phút
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedMachine(machine);
+                            setIsUpdateDialogOpen(true);
+                          }}
+                        >
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </CardContent>
@@ -348,10 +356,11 @@ export default function Machines() {
             onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
+              const manager = managers.find(m => m.id === formData.get('managerId'));
               mutateAction.mutate({
                 name: formData.get('name') as string,
                 managerId: formData.get('managerId') as string,
-                managerName: formData.get('managerName') as string,
+                managerName: manager ? manager.name : '',
                 status: formData.get('status') as SewingMachine['status'],
                 currentThreadColor: formData.get('threadColor') as string,
                 currentProductId: formData.get('productId') as string,
@@ -369,54 +378,69 @@ export default function Machines() {
                   <Input
                     name="name"
                     required
+                    placeholder="Nhập tên máy"
                   />
                 </div>
                 <div>
-                  <Label>ID người quản lý</Label>
-                  <Input
-                    name="managerId"
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Tên người quản lý</Label>
-                  <Input
-                    name="managerName"
-                    required
-                  />
+                  <Label>Người quản lý</Label>
+                  <Select name="managerId" required>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn người quản lý" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {managers.map(manager => (
+                        <SelectItem key={manager.id} value={manager.id}>
+                          {manager.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
             )}
 
             <div>
               <Label>Trạng thái</Label>
-              <select
-                name="status"
-                className="w-full"
+              <Select 
+                name="status" 
                 defaultValue={selectedMachine?.status}
               >
-                {MACHINE_STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn trạng thái" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MACHINE_STATUSES.map(status => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <Label>Màu chỉ hiện tại</Label>
-              <select
+              <Select 
                 name="threadColor"
-                className="w-full"
                 defaultValue={selectedMachine?.currentThreadColor}
               >
-                <option value="">Chọn màu chỉ</option>
-                {THREAD_COLORS.map(color => (
-                  <option key={color.id} value={color.hex}>
-                    {color.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn màu chỉ" />
+                </SelectTrigger>
+                <SelectContent>
+                  {THREAD_COLORS.map(color => (
+                    <SelectItem key={color.id} value={color.hex}>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-4 h-4 rounded-full border" 
+                          style={{ backgroundColor: color.hex }}
+                        />
+                        {color.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -424,25 +448,28 @@ export default function Machines() {
               <Input
                 name="productName"
                 defaultValue={selectedMachine?.currentProductName}
+                placeholder="Nhập tên sản phẩm"
               />
             </div>
 
-            <div>
-              <Label>Thời gian bắt đầu</Label>
-              <Input
-                type="datetime-local"
-                name="startTime"
-                defaultValue={selectedMachine?.startTime}
-              />
-            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>Thời gian bắt đầu</Label>
+                <Input
+                  type="datetime-local"
+                  name="startTime"
+                  defaultValue={selectedMachine?.startTime}
+                />
+              </div>
 
-            <div>
-              <Label>Thời gian dự kiến hoàn thành</Label>
-              <Input
-                type="datetime-local"
-                name="estimatedEndTime"
-                defaultValue={selectedMachine?.estimatedEndTime}
-              />
+              <div>
+                <Label>Thời gian dự kiến hoàn thành</Label>
+                <Input
+                  type="datetime-local"
+                  name="estimatedEndTime"
+                  defaultValue={selectedMachine?.estimatedEndTime}
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-2">

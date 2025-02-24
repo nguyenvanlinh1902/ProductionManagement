@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { register } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
 
 type UserFormData = {
   email: string;
@@ -45,6 +46,12 @@ type UserFormData = {
   name: string;
   role: string;
 };
+
+const USER_ROLES = [
+  { value: 'admin', label: 'Quản trị viên' },
+  { value: 'worker', label: 'Công nhân' },
+  { value: 'machine_manager', label: 'Quản lý máy' }
+];
 
 export default function Users() {
   const [isOpen, setIsOpen] = useState(false);
@@ -123,12 +130,12 @@ export default function Users() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Người dùng</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold">Người dùng</h1>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Thêm người dùng
             </Button>
@@ -188,8 +195,11 @@ export default function Users() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="admin">Quản trị viên</SelectItem>
-                          <SelectItem value="worker">Công nhân</SelectItem>
+                          {USER_ROLES.map(role => (
+                            <SelectItem key={role.value} value={role.value}>
+                              {role.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </FormItem>
@@ -203,7 +213,7 @@ export default function Users() {
       </div>
 
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -211,16 +221,16 @@ export default function Users() {
                 <TableHead>Tên</TableHead>
                 <TableHead>Vai trò</TableHead>
                 <TableHead>Công đoạn</TableHead>
-                <TableHead>Trạng thái</TableHead> {/* Added this line */}
+                <TableHead>Trạng thái</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users?.map((user: any) => (
                 <TableRow key={user.id}>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell className="min-w-[200px]">{user.email}</TableCell>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>
-                    {user.role === 'admin' ? 'Quản trị viên' : 'Công nhân'}
+                    {USER_ROLES.find(r => r.value === user.role)?.label || 'Không xác định'}
                   </TableCell>
                   <TableCell>
                     {user.role === 'worker' && stages && (
@@ -264,11 +274,14 @@ export default function Users() {
                       </Popover>
                     )}
                   </TableCell>
-                  <TableCell> {/* Added this line */}
-                    <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                  <TableCell>
+                    <span className={cn(
+                      "px-2 py-1 rounded-full text-xs",
+                      "bg-green-100 text-green-800"
+                    )}>
                       Hoạt động
                     </span>
-                  </TableCell> {/* Added this line */}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
