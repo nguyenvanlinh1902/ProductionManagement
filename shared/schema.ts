@@ -9,7 +9,19 @@ export const userSchema = z.object({
   createdAt: z.string()
 });
 
-export const printingTechniqueSchema = z.enum(['DTF_PRINTING', 'DTG_PRINTING']);
+// Product Types and Techniques
+export const productTypeSchema = z.enum(['EMBROIDERY', 'DTF_PRINTING', 'DTG_PRINTING']);
+
+// Locations schema based on product type
+export const embroideryLocationSchema = z.enum([
+  'LEFT_CHEST',
+  'RIGHT_CHEST',
+  'CENTERED',
+  'LARGE_CENTER',
+  'LEFT_SLEEVE',
+  'RIGHT_SLEEVE',
+  'SPECIAL_LOCATION'
+]);
 
 export const printingLocationSchema = z.enum([
   'LEFT_CHEST',
@@ -21,14 +33,30 @@ export const printingLocationSchema = z.enum([
   'SPECIAL_LOCATION'
 ]);
 
+// Production details based on type
+export const embroideryDetailsSchema = z.object({
+  type: z.literal('EMBROIDERY'),
+  mainLocation: embroideryLocationSchema,
+  additionalLocations: z.array(embroideryLocationSchema).optional(),
+  designUrl: z.string().optional(),
+  mockupUrl: z.string().optional(),
+  hasEmbroideryFile: z.boolean().default(false),
+});
+
 export const printingDetailsSchema = z.object({
-  technique: printingTechniqueSchema,
+  type: z.enum(['DTF_PRINTING', 'DTG_PRINTING']),
   mainLocation: printingLocationSchema,
   additionalLocations: z.array(printingLocationSchema).optional(),
   designUrl: z.string().optional(),
   mockupUrl: z.string().optional(),
   hasPrintingFile: z.boolean().default(false),
 });
+
+// Combined production details
+export const productionDetailsSchema = z.discriminatedUnion('type', [
+  embroideryDetailsSchema,
+  printingDetailsSchema
+]);
 
 export const productSchema = z.object({
   id: z.string(),
@@ -37,7 +65,7 @@ export const productSchema = z.object({
   price: z.number(),
   color: z.string(),
   size: z.string(),
-  printingDetails: printingDetailsSchema,
+  productionDetails: productionDetailsSchema,
   quantity: z.number()
 });
 
@@ -77,6 +105,7 @@ export type User = z.infer<typeof userSchema>;
 export type Order = z.infer<typeof orderSchema>;
 export type Product = z.infer<typeof productSchema>;
 export type ProductionStage = z.infer<typeof productionStageSchema>;
-export type PrintingTechnique = z.infer<typeof printingTechniqueSchema>;
+export type ProductType = z.infer<typeof productTypeSchema>;
+export type EmbroideryLocation = z.infer<typeof embroideryLocationSchema>;
 export type PrintingLocation = z.infer<typeof printingLocationSchema>;
-export type PrintingDetails = z.infer<typeof printingDetailsSchema>;
+export type ProductionDetails = z.infer<typeof productionDetailsSchema>;

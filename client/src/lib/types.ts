@@ -4,7 +4,7 @@ export interface EmbroideryPosition {
   name: string;
   description: string;
   designUrl?: string;
-  status: 'pending' | 'in_progress' | 'completed'; // Added status field
+  status: 'pending' | 'in_progress' | 'completed';
 }
 
 export interface Product {
@@ -15,7 +15,7 @@ export interface Product {
   color: string;
   size: string;
   embroideryPositions: EmbroideryPosition[];
-  manufactured?: boolean; // Add manufactured flag
+  manufactured?: boolean;
 }
 
 export interface Customer {
@@ -171,10 +171,10 @@ export const machineRecommendationSchema = z.object({
 // Thêm các interface mới
 export interface MachineGroup {
   id: string;
-  name: string; // Tên nhóm máy
+  name: string; 
   managerId: string;
   managerName: string;
-  machineIds: string[]; // Danh sách ID các máy trong nhóm
+  machineIds: string[]; 
 }
 
 export interface MachineOperation {
@@ -210,4 +210,42 @@ export const machineOperationSchema = z.object({
   actualEndTime: z.string().optional(),
   status: z.enum(['in_progress', 'completed', 'delayed']),
   notes: z.string().optional()
+});
+
+export interface OrderImport {
+  productType: 'EMBROIDERY' | 'DTF_PRINTING' | 'DTG_PRINTING';
+  orderNumber: string;
+  customer: string;
+  salesChannel: string;
+  products: {
+    name: string;
+    sku: string;
+    price: number;
+    color: string;
+    size: string;
+    quantity: number;
+    mainLocation: string;
+    additionalLocations?: string[];
+    designUrl?: string;
+    hasProductionFile: boolean;
+  }[];
+}
+
+export const orderImportSchema = z.object({
+  productType: z.enum(['EMBROIDERY', 'DTF_PRINTING', 'DTG_PRINTING']),
+  orderNumber: z.string(),
+  customer: z.string(),
+  salesChannel: z.string(),
+  products: z.array(z.object({
+    name: z.string(),
+    sku: z.string(),
+    price: z.number(),
+    color: z.string(),
+    size: z.string(),
+    quantity: z.number(),
+    mainLocation: z.string(),
+    additionalLocations: z.array(z.string()).optional(),
+    designUrl: z.string().optional(),
+    hasProductionFile: z.boolean()
+  }))
 });

@@ -16,10 +16,9 @@ import Warehouse from "@/pages/warehouse";
 import NotFound from "@/pages/not-found";
 import Settings from "@/pages/settings";
 import Users from "@/pages/users";
-import Shopify from "@/pages/shopify";
 import Machines from "@/pages/machines"; 
 import MachineGroupView from "@/pages/machine-group";
-import MachineMonitor from './pages/machine-monitor'; // Added import
+import MachineMonitor from './pages/machine-monitor';
 
 // Layout components
 import { Sidebar } from "@/components/layout/sidebar";
@@ -33,7 +32,7 @@ function LoadingSpinner() {
   );
 }
 
-function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
+function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string | string[] }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const { toast } = useToast();
@@ -71,7 +70,8 @@ function PrivateRoute({ children, requiredRole }: { children: React.ReactNode, r
     return <LoadingSpinner />;
   }
 
-  if (!auth.currentUser || (requiredRole && userRole !== requiredRole && !Array.isArray(requiredRole) && requiredRole.includes(userRole) === false) ) {
+  if (!auth.currentUser || (requiredRole && typeof requiredRole === 'string' && userRole !== requiredRole) || 
+      (Array.isArray(requiredRole) && !requiredRole.includes(userRole || ''))) {
     window.location.href = '/login';
     return null;
   }
@@ -125,17 +125,16 @@ function Router() {
           <Users />
         </PrivateRoute>
       </Route>
-      <Route path="/shopify">
-        <PrivateRoute requiredRole="admin">
-          <Shopify />
-        </PrivateRoute>
-      </Route>
       <Route path="/machines">
         <PrivateRoute requiredRole={["admin", "machine_manager"]}>
           <Machines />
         </PrivateRoute>
       </Route>
-
+      <Route path="/machine-group">
+        <PrivateRoute requiredRole={["manager", "machine_manager", "admin"]}>
+          <MachineGroupView />
+        </PrivateRoute>
+      </Route>
       <Route path="/machine-monitor">
         <PrivateRoute requiredRole={["machine_monitor", "admin"]}>
           <MachineMonitor />
