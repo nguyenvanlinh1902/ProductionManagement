@@ -1,88 +1,85 @@
-import { 
-  users, type User, type InsertUser,
-  orders, type Order, type InsertOrder,
-  products, type Product, type InsertProduct,
-  productionStages, type ProductionStage, type InsertProductionStage
-} from "@shared/schema";
-import { db } from "./db";
-import { eq } from "drizzle-orm";
+
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from './firebase';
+import type { User, Order, Product, ProductionStage } from '@shared/schema';
 
 export interface IStorage {
   // User operations
-  getUser(id: number): Promise<User | undefined>;
+  getUser(uid: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: User): Promise<User>;
 
-  // Order operations
+  // Order operations  
   getOrders(): Promise<Order[]>;
-  createOrder(order: InsertOrder): Promise<Order>;
+  createOrder(order: Omit<Order, 'id'>): Promise<Order>;
 
   // Product operations
   getProducts(): Promise<Product[]>;
-  createProduct(product: InsertProduct): Promise<Product>;
+  createProduct(product: Omit<Product, 'id'>): Promise<Product>;
 
   // Production stage operations
-  getProductionStages(orderId: number): Promise<ProductionStage[]>;
-  completeProductionStage(stageId: number, userId: number): Promise<ProductionStage>;
+  getProductionStages(orderId: string): Promise<ProductionStage[]>;
+  completeProductionStage(stageId: string, userId: string): Promise<ProductionStage>;
 }
 
-export class DatabaseStorage implements IStorage {
+export class FirebaseStorage implements IStorage {
   // User operations
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  async getUser(uid: string): Promise<User | undefined> {
+    const userDoc = await getDoc(doc(db, 'users', uid));
+    return userDoc.exists() ? userDoc.data() as User : undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    const q = query(collection(db, 'users'), where('email', '==', email));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty ? snapshot.docs[0].data() as User : undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
+  async createUser(user: User): Promise<User> {
+    await setDoc(doc(db, 'users', user.uid), user);
     return user;
   }
 
   // Order operations
   async getOrders(): Promise<Order[]> {
-    return await db.select().from(orders);
+    const snapshot = await getDocs(collection(db, 'orders'));
+    return snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Order));
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const [order] = await db.insert(orders).values(insertOrder).returning();
-    return order;
+  async createOrder(order: Omit<Order, 'id'>): Promise<Order> {
+    const docRef = await addDoc(collection(db, 'orders'), order);
+    return {id: docRef.id, ...order};
   }
 
   // Product operations
   async getProducts(): Promise<Product[]> {
-    return await db.select().from(products);
+    const snapshot = await getDocs(collection(db, 'products'));
+    return snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Product));
   }
 
-  async createProduct(insertProduct: InsertProduct): Promise<Product> {
-    const [product] = await db.insert(products).values(insertProduct).returning();
-    return product;
+  async createProduct(product: Omit<Product, 'id'>): Promise<Product> {
+    const docRef = await addDoc(collection(db, 'products'), product);
+    return {id: docRef.id, ...product};
   }
 
   // Production stage operations
-  async getProductionStages(orderId: number): Promise<ProductionStage[]> {
-    return await db
-      .select()
-      .from(productionStages)
-      .where(eq(productionStages.orderId, orderId));
+  async getProductionStages(orderId: string): Promise<ProductionStage[]> {
+    const q = query(collection(db, 'productionStages'), where('orderId', '==', orderId));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as ProductionStage));
   }
 
-  async completeProductionStage(stageId: number, userId: number): Promise<ProductionStage> {
-    const [stage] = await db
-      .update(productionStages)
-      .set({
-        status: "completed",
-        completedAt: new Date(),
-        completedBy: userId,
-      })
-      .where(eq(productionStages.id, stageId))
-      .returning();
-    return stage;
+  async completeProductionStage(stageId: string, userId: string): Promise<ProductionStage> {
+    const stageRef = doc(db, 'productionStages', stageId);
+    const update = {
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+      completedBy: userId
+    };
+    await updateDoc(stageRef, update);
+    const stageDoc = await getDoc(stageRef);
+    return {id: stageId, ...stageDoc.data()} as ProductionStage;
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new FirebaseStorage();
