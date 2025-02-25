@@ -15,6 +15,22 @@ export const machineTypeSchema = z.enum(['DTF_PRINTING', 'DTG_PRINTING']);
 // Production Types
 export const productTypeSchema = z.enum(['EMBROIDERY', 'DTF_PRINTING', 'DTG_PRINTING']);
 
+// Production steps
+export const embroideryStepSchema = z.enum([
+  'PREPARATION',
+  'EMBROIDERY_OUTLINE',
+  'EMBROIDERY_FILL',
+  'EMBROIDERY_DETAILS',
+  'QUALITY_CHECK'
+]);
+
+export const printingStepSchema = z.enum([
+  'FILE_PREPARATION',
+  'PRINTING',
+  'HEAT_PRESS',
+  'QUALITY_CHECK'
+]);
+
 // Locations schema based on product type
 export const embroideryLocationSchema = z.enum([
   'LEFT_CHEST',
@@ -34,22 +50,6 @@ export const printingLocationSchema = z.enum([
   'RIGHT_SLEEVE',
   'BACK_LOCATION',
   'SPECIAL_LOCATION'
-]);
-
-// Production steps
-export const embroideryStepSchema = z.enum([
-  'PREPARATION',
-  'EMBROIDERY_OUTLINE',
-  'EMBROIDERY_FILL',
-  'EMBROIDERY_DETAILS',
-  'QUALITY_CHECK'
-]);
-
-export const printingStepSchema = z.enum([
-  'FILE_PREPARATION',
-  'PRINTING',
-  'HEAT_PRESS',
-  'QUALITY_CHECK'
 ]);
 
 // Production details based on type

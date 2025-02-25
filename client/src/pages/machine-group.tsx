@@ -52,16 +52,27 @@ export default function MachineGroupView() {
   const [selectedMachine, setSelectedMachine] = useState<SewingMachine | null>(null);
   const [completionDialog, setCompletionDialog] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [userRole, setUserRole] = useState<string | null>(null); 
-  
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Fetch all machine groups (for admin)
+  const { data: allGroups = [] } = useQuery<MachineGroup[]>({
+    queryKey: ['/api/machine-groups'],
+    queryFn: async () => {
+      const groupsRef = collection(db, "machine_groups");
+      const snapshot = await getDocs(groupsRef);
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as MachineGroup[];
+    },
+    enabled: userRole === 'admin'
+  });
 
   // Fetch machine group for current user
   const { data: machineGroup } = useQuery<MachineGroup>({
     queryKey: ['/api/machine-groups/my'],
     queryFn: async () => {
-      // TODO: Get current user ID
       const userId = "current-user-id";
-
       const groupsRef = collection(db, "machine_groups");
       const q = query(groupsRef, where("managerId", "==", userId));
       const snapshot = await getDocs(q);
@@ -78,7 +89,6 @@ export default function MachineGroupView() {
     enabled: userRole !== 'admin'
   });
 
-  // Get effective group ID based on role and selection
   const effectiveGroupId = userRole === 'admin' ? selectedGroupId : machineGroup?.id;
 
   // Fetch machines in group
@@ -162,11 +172,27 @@ export default function MachineGroupView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Quản lý nhóm máy</h1>
-          <p className="text-muted-foreground">
-            Người quản lý: {machineGroup?.managerName}
+          {userRole === 'admin' ? (
+            <div className="flex items-center gap-4 mt-2">
+              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Chọn nhóm máy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allGroups.map(group => (
+                    <SelectItem key={group.id} value={group.id}>
+                      {group.name} - {group.managerName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              Người quản lý: {machineGroup?.managerName}
             </p>
           )}
         </div>
@@ -176,7 +202,7 @@ export default function MachineGroupView() {
         <CardHeader>
           <CardTitle>Danh sách máy được phân công</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
