@@ -53,19 +53,7 @@ export default function MachineGroupView() {
   const [completionDialog, setCompletionDialog] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [userRole, setUserRole] = useState<string | null>(null); 
-  // Fetch all machine groups (for admin)
-  const { data: allGroups = [] } = useQuery<MachineGroup[]>({
-    queryKey: ['/api/machine-groups'],
-    queryFn: async () => {
-      const groupsRef = collection(db, "machine_groups");
-      const snapshot = await getDocs(groupsRef);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as MachineGroup[];
-    },
-    enabled: userRole === 'admin'
-  });
+  
 
   // Fetch machine group for current user
   const { data: machineGroup } = useQuery<MachineGroup>({
@@ -177,24 +165,8 @@ export default function MachineGroupView() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Quản lý nhóm máy</h1>
-          {userRole === 'admin' ? (
-            <div className="flex items-center gap-4 mt-2">
-              <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Chọn nhóm máy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allGroups.map(group => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.name} - {group.managerName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">
-              Người quản lý: {machineGroup?.managerName}
+          <p className="text-muted-foreground">
+            Người quản lý: {machineGroup?.managerName}
             </p>
           )}
         </div>
