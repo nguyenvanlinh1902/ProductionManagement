@@ -1,6 +1,6 @@
-import { Router } from 'express';
-import { orderSchema, printingDetailsSchema, PrintingLocation } from '@shared/schema';
-import { storage } from '../storage';
+import { Router } from "express";
+import { orderSchema } from "@shared/schema";
+import { storage } from "../storage";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ interface ShopifyOrder {
   line_items: ShopifyLineItem[];
 }
 
-router.post('/webhook/order/create', async (req, res) => {
+router.post("/webhook/order/create", async (req, res) => {
   try {
     const shopifyOrder: ShopifyOrder = req.body;
 
@@ -41,16 +41,27 @@ router.post('/webhook/order/create', async (req, res) => {
       orderNumber: shopifyOrder.order_number.toString(),
       customer: `${shopifyOrder.customer.first_name} ${shopifyOrder.customer.last_name}`,
       salesChannel: shopifyOrder.source_name,
-      status: 'pending',
-      products: shopifyOrder.line_items.map(item => {
+      status: "pending",
+      products: shopifyOrder.line_items.map((item) => {
         // Parse printing details from properties
         const printingDetails = {
-          technique: item.properties.find(p => p.name === 'Printing Techniques')?.value === 'DTG Printing' 
-            ? 'DTG_PRINTING' : 'DTF_PRINTING',
-          mainLocation: parseLocation(item.properties.find(p => p.name === 'Font Location')?.value),
-          additionalLocations: parseAdditionalLocations(item.properties.find(p => p.name === 'More locations')?.value),
-          designUrl: item.properties.find(p => p.name === 'Link Design, Mockup')?.value,
-          hasPrintingFile: item.properties.find(p => p.name === 'Printing file')?.value !== 'No printing file'
+          technique:
+            item.properties.find((p) => p.name === "Printing Techniques")
+              ?.value === "DTG Printing"
+              ? "DTG_PRINTING"
+              : "DTF_PRINTING",
+          mainLocation: parseLocation(
+            item.properties.find((p) => p.name === "Font Location")?.value,
+          ),
+          additionalLocations: parseAdditionalLocations(
+            item.properties.find((p) => p.name === "More locations")?.value,
+          ),
+          designUrl: item.properties.find(
+            (p) => p.name === "Link Design, Mockup",
+          )?.value,
+          hasPrintingFile:
+            item.properties.find((p) => p.name === "Printing file")?.value !==
+            "No printing file",
         };
 
         return {
@@ -58,16 +69,20 @@ router.post('/webhook/order/create', async (req, res) => {
           name: item.title,
           sku: item.sku,
           price: parseFloat(item.price),
-          color: item.properties.find(p => p.name === 'Color')?.value,
-          size: item.properties.find(p => p.name === 'Size')?.value,
+          color: item.properties.find((p) => p.name === "Color")?.value,
+          size: item.properties.find((p) => p.name === "Size")?.value,
           printingDetails,
-          quantity: item.quantity
+          quantity: item.quantity,
         };
       }),
-      designUrls: shopifyOrder.line_items.map(item => 
-        item.properties.find(p => p.name === 'Link Design, Mockup')?.value
-      ).filter(Boolean),
-      createdAt: new Date().toISOString()
+      designUrls: shopifyOrder.line_items
+        .map(
+          (item) =>
+            item.properties.find((p) => p.name === "Link Design, Mockup")
+              ?.value,
+        )
+        .filter(Boolean),
+      createdAt: new Date().toISOString(),
     };
 
     // Validate transformed order
@@ -76,35 +91,38 @@ router.post('/webhook/order/create', async (req, res) => {
     // Save to database
     await storage.createOrder(validatedOrder);
 
-    res.status(200).json({ message: 'Order processed successfully' });
+    res.status(200).json({ message: "Order processed successfully" });
   } catch (error) {
-    console.error('Error processing Shopify webhook:', error);
-    res.status(500).json({ error: 'Failed to process order' });
+    console.error("Error processing Shopify webhook:", error);
+    res.status(500).json({ error: "Failed to process order" });
   }
 });
 
 // Helper functions to parse locations
 function parseLocation(location: string | undefined): PrintingLocation {
   const locationMap: Record<string, PrintingLocation> = {
-    'Centered (30x40 cm)': 'CENTERED',
-    'Left Chest': 'LEFT_CHEST',
-    'Large Center (max 60 x 60 cm)': 'LARGE_CENTER'
+    "Centered (30x40 cm)": "CENTERED",
+    "Left Chest": "LEFT_CHEST",
+    "Large Center (max 60 x 60 cm)": "LARGE_CENTER",
   };
-  return location ? locationMap[location] || 'CENTERED' : 'CENTERED';
+  return location ? locationMap[location] || "CENTERED" : "CENTERED";
 }
 
-function parseAdditionalLocations(locations: string | undefined): PrintingLocation[] {
+function parseAdditionalLocations(
+  locations: string | undefined,
+): PrintingLocation[] {
   if (!locations) return [];
 
   const locationMap: Record<string, PrintingLocation> = {
-    'Left Sleeve': 'LEFT_SLEEVE',
-    'Right Sleeve': 'RIGHT_SLEEVE',
-    'Back Location': 'BACK_LOCATION',
-    'Special Location': 'SPECIAL_LOCATION'
+    "Left Sleeve": "LEFT_SLEEVE",
+    "Right Sleeve": "RIGHT_SLEEVE",
+    "Back Location": "BACK_LOCATION",
+    "Special Location": "SPECIAL_LOCATION",
   };
 
-  return locations.split(',')
-    .map(loc => locationMap[loc.trim()])
+  return locations
+    .split(",")
+    .map((loc) => locationMap[loc.trim()])
     .filter((loc): loc is PrintingLocation => Boolean(loc));
 }
 
